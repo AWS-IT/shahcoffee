@@ -1,0 +1,126 @@
+/* =========================
+   SASS-ПЕРЕМЕННЫЕ
+   ========================= */
+
+/* Базовые цвета */
+$color-page-bg:   #f6f1e9;  // тёплый фон страницы
+$color-card-bg:   #ffffff;
+$color-bg-dark:   #04151F;
+
+$color-primary:       #008B9D;
+$color-primary-dark:  #0094A0;
+$color-primary-light: #00C0D9;
+
+/* Текст */
+$color-text-main:   #2b2620;
+$color-text-light:  #ffffff;
+$color-text-muted:  #8a7b6a;
+
+/* Акценты */
+$color-accent:          #32c7c2;
+$color-accent-hover:    #22b0ab;
+$color-accent-soft:     #e3fbfa;
+$color-accent-cyan:     #3bc9c1;
+$color-accent-cyan-soft:#d7f7f5;
+$color-accent-red:      #ff4b4b;
+
+/* Бордеры */
+$color-border-subtle: rgba($color-text-main, 0.08);
+$color-border-strong: rgba($color-text-main, 0.16);
+$color-border-soft:   rgba($color-text-main, 0.12);
+
+/* Фон для секций / конструктора */
+$color-bg-main: $color-page-bg;
+
+/* Радиусы */
+$radius-lg:   24px;
+$radius-md:   16px;
+$radius-sm:   10px;
+$radius-pill: 999px;
+
+/* Тени */
+$shadow-soft: 0 18px 45px rgba(15, 10, 5, 0.12);
+$shadow-card: 0 10px 30px rgba(15, 10, 5, 0.08);
+
+/* Отступы */
+$spacing-xs:  8px;
+$spacing-sm: 16px;
+$spacing-md: 24px;
+$spacing-lg: 48px;
+$spacing-xl: 72px;
+$spacing-2xl: 96px;
+
+/* Типографика */
+$font-family:       system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+$font-size-base:    16px;
+$font-size-lg:      18px;
+$font-size-xl:      24px;
+$font-size-2xl:     32px;
+$font-size-3xl:     48px;
+$line-height-normal:1.5;
+$line-height-tight: 1.2;
+
+/* Транзишены */
+$transition-base: 0.25s ease;
+$transition-fast: 0.15s ease;
+
+/* Брейкпоинты */
+$bp-desktop:   1200px;
+$bp-laptop:    1024px;
+$bp-tablet:     900px;
+$bp-mobile:     768px;
+$bp-mobile-sm:  480px;
+
+
+/* =========================
+   CSS-ПЕРЕМЕННЫЕ (:root)
+   ========================= */
+
+:root {
+  /* Фон и поверхности */
+  --color-page-bg:        #{$color-page-bg};
+  --color-surface:        #{$color-card-bg};
+  --color-surface-soft:   #f0e4d4;  // можешь поменять под вкус
+  --color-surface-strong: #e4d4c1;
+
+  /* Акценты */
+  --color-accent:         #{$color-accent};
+  --color-accent-hover:   #{$color-accent-hover};
+  --color-accent-soft:    #{$color-accent-soft};
+
+  /* Текст */
+  --color-text-main:      #{$color-text-main};
+  --color-text-muted:     #{$color-text-muted};
+  --color-text-on-accent: #{$color-text-light};
+
+  /* Бордеры */
+  --color-border-subtle:  #{$color-border-subtle};
+  --color-border-strong:  #{$color-border-strong};
+
+  /* Радиусы */
+  --radius-lg:   #{$radius-lg};
+  --radius-md:   #{$radius-md};
+  --radius-sm:   #{$radius-sm};
+  --radius-pill: #{$radius-pill};
+
+  /* Тени */
+  --shadow-soft: #{$shadow-soft};
+  --shadow-card: #{$shadow-card};
+
+  /* Типографика и отступы (если хочешь использовать var(...) где-то) */
+  --font-family:       #{$font-family};
+  --font-size-base:    #{$font-size-base};
+  --font-size-lg:      #{$font-size-lg};
+  --font-size-xl:      #{$font-size-xl};
+  --font-size-2xl:     #{$font-size-2xl};
+  --font-size-3xl:     #{$font-size-3xl};
+  --line-height-normal:#{$line-height-normal};
+  --line-height-tight: #{$line-height-tight};
+
+  --spacing-xs:  #{$spacing-xs};
+  --spacing-sm:  #{$spacing-sm};
+  --spacing-md:  #{$spacing-md};
+  --spacing-lg:  #{$spacing-lg};
+  --spacing-xl:  #{$spacing-xl};
+  --spacing-2xl: #{$spacing-2xl};
+}
