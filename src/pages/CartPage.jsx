@@ -1,19 +1,51 @@
 // src/pages/CartPage.jsx
-import React from 'react'
+import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext.jsx'
-
-
-const PUBLIC_CATALOG_URL = 'https://b2b.moysklad.ru/public/Nk4i8a8eOIMa/catalog'
+import CheckoutForm from '../components/CheckoutForm.jsx'
 
 export default function CartPage() {
   const { cart, updateQuantity, removeFromCart, clearCart, totalPrice } = useCart()
   const navigate = useNavigate()
+  const [showCheckoutForm, setShowCheckoutForm] = useState(false)
 
-  const handleCheckout = () => {
-    clearCart()
+  const handleCheckout = async (formData) => {
+    try {
+      // Отправляем данные заказа на сервер
+      const response = await fetch('http://localhost:3001/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          customer: {
+            name: formData.name,
+            phone: formData.phone,
+            address: formData.address,
+            comment: formData.comment
+          },
+          items: cart,
+          totalPrice: totalPrice
+        })
+      })
 
-    window.location.href = PUBLIC_CATALOG_URL
+      if (!response.ok) {
+        throw new Error('Ошибка при создании заказа')
+      }
+
+      const result = await response.json()
+      
+      // Очищаем корзину и закрываем форму
+      clearCart()
+      setShowCheckoutForm(false)
+      
+      // Показываем сообщение об успехе
+      alert(`Заказ ${result.orderNumber} успешно создан!`)
+      navigate('/catalog')
+    } catch (error) {
+      console.error('Ошибка:', error)
+      throw error
+    }
   }
 
   if (cart.length === 0) {
@@ -81,23 +113,24 @@ export default function CartPage() {
           </div>
 
           <div className="cart-actions">
-            <button onClick={handleCheckout} className="btn-primary btn-lg">
-              Оформить заказ в МойСклад
+            <button onClick={() => setShowCheckoutForm(true)} className="btn-primary btn-lg">
+              Оформить заказ
             </button>
 
             <button onClick={clearCart} className="btn-secondary">
               Очистить корзину
             </button>
           </div>
-
-          <div className="cart-note">
-            <p>
-              После нажатия вы перейдёте в официальный каталог МойСклада.<br />
-              Там можно изменить количество, добавить товары и завершить заказ.<br />
-              <strong>Никакой регистрации не требуется.</strong>
-            </p>
-          </div>
         </div>
+
+        {showCheckoutForm && (
+          <CheckoutForm 
+            totalPrice={totalPrice}
+            cartItems={cart}
+            onClose={() => setShowCheckoutForm(false)}
+            onSubmit={handleCheckout}
+          />
+        )}
         
       </div>
     </section>
