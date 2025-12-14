@@ -3,23 +3,16 @@ import React from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext.jsx'
 
-// ВСТАВЬ СЮДА СВОЮ ОБЩЕДОСТУПНУЮ ССЫЛКУ ИЗ ПРИЛОЖЕНИЯ "ОНЛАЙН-ЗАКАЗ"
-// Примеры:
-// https://b2b.moysklad.ru/public/Nk4i8a8eOIMa/catalog
-// https://online.moysklad.ru/app/#onlineorder?id=8a9f7e3d-1a2b-4c5d-9e8f-7g6h5i4j3k2l
+
 const PUBLIC_CATALOG_URL = 'https://b2b.moysklad.ru/public/Nk4i8a8eOIMa/catalog'
-// Если у тебя ссылка с #onlineorder — тоже подойдёт:
-// const PUBLIC_CATALOG_URL = 'https://online.moysklad.ru/app/#onlineorder?id=abc123'
 
 export default function CartPage() {
   const { cart, updateQuantity, removeFromCart, clearCart, totalPrice } = useCart()
   const navigate = useNavigate()
 
   const handleCheckout = () => {
-    // Очищаем локальную корзину (чтобы не было дублей)
     clearCart()
 
-    // Переходим в официальный публичный каталог МойСклада — без логина, без твоего ЛК
     window.location.href = PUBLIC_CATALOG_URL
   }
 
