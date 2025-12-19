@@ -11,7 +11,7 @@ export default function CatalogPreview() {
 
   const loadProducts = async () => {
     try {
-      const response = await fetch('/api_ms/api/remap/1.2/entity/product?limit=100&expand=salePrices.priceType,images&images.limit=20')
+      const response = await fetch('/api/products')
       const data = await response.json()
       
       if (response.ok && data.rows) {

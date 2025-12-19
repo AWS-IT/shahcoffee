@@ -3,11 +3,19 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
+import fetch from 'node-fetch';
+import { initDatabase, getProducts, getProductById, upsertProduct, clearProducts, getSetting, setSetting } from './db.js';
 dotenv.config();
+
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+app.get('/health', (req, res) => {
+  res.json({ ok: true });
+});
 
 // Публичный токен
 const PUBLIC_TOKEN = process.env.MOYSKLAD_PUBLIC_TOKEN;
@@ -52,6 +60,9 @@ function saveCredentials(creds) {
 // Загружаем credentials при старте
 loadCredentials();
 
+// Инициализируем БД
+await initDatabase();
+
 if (!PUBLIC_TOKEN) {
   console.error('ОШИБКА! Проверь .env файл:');
   console.error('MOYSKLAD_PUBLIC_TOKEN=твой_публичный_токен');
@@ -90,6 +101,205 @@ app.use('/api_ms', async (req, res) => {
   } catch (e) {
     console.error('Ошибка проксирования:', e);
     res.status(500).json({ error: 'Proxy error' });
+  }
+});
+
+// ========== API ДЛЯ ТОВАРОВ (ИЗ БД) ==========
+
+// Получить все товары из кеша БД
+app.get('/api/products', async (req, res) => {
+  try {
+    const products = await getProducts();
+    
+    // Преобразуем формат БД обратно в формат МойСклад (для совместимости с фронтендом)
+    const formatted = products.map(p => {
+      const baseProduct = {
+        id: p.id,
+        name: p.name,
+        code: p.code,
+        description: p.description,
+        meta: { href: p.meta_href }
+      };
+      
+      // Если есть сохранённый data (полный объект), используем его
+      if (p.data) {
+        try {
+          const fullData = JSON.parse(p.data);
+          return { ...fullData, id: p.id };
+        } catch (e) {
+          console.warn('Не удалось распарсить data для товара', p.id);
+        }
+      }
+      
+      // Иначе собираем минимальный объект
+      return {
+        ...baseProduct,
+        salePrices: p.price_rub ? [{ value: p.price_rub * 100, priceType: { name: 'Цена продажи' } }] : [],
+        images: p.image_url ? { rows: [{ miniature: { downloadHref: p.image_url } }] } : { rows: [] }
+      };
+    });
+    
+    res.json({ rows: formatted });
+  } catch (error) {
+    console.error('Ошибка получения товаров из БД:', error);
+    res.status(500).json({ error: 'Ошибка получения товаров' });
+  }
+});
+
+// Получить один товар по ID из БД
+app.get('/api/products/:id', async (req, res) => {
+  try {
+    const product = await getProductById(req.params.id);
+    
+    if (!product) {
+      return res.status(404).json({ error: 'Товар не найден' });
+    }
+    
+    // Если есть полный data, возвращаем его
+    if (product.data) {
+      try {
+        const fullData = JSON.parse(product.data);
+        return res.json({ ...fullData, id: product.id });
+      } catch (e) {
+        console.warn('Не удалось распарсить data для товара', product.id);
+      }
+    }
+    
+    // Иначе минимальный объект
+    res.json({
+      id: product.id,
+      name: product.name,
+      code: product.code,
+      description: product.description,
+      meta: { href: product.meta_href },
+      salePrices: product.price_rub ? [{ value: product.price_rub * 100, priceType: { name: 'Цена продажи' } }] : [],
+      images: product.image_url ? { rows: [{ miniature: { downloadHref: product.image_url } }] } : { rows: [] }
+    });
+  } catch (error) {
+    console.error('Ошибка получения товара из БД:', error);
+    res.status(500).json({ error: 'Ошибка получения товара' });
+  }
+});
+
+// Синхронизация товаров из МойСклад в БД
+app.post('/admin/sync-products', async (req, res) => {
+  try {
+    const { token } = req.body;
+    
+    if (!token) {
+      return res.status(400).json({ error: 'Токен обязателен' });
+    }
+    
+    console.log('Начинаем синхронизацию товаров из МойСклад...');
+    
+    // Очищаем старый кеш перед началом синхронизации
+    await clearProducts();
+    
+    let allProducts = [];
+    let offset = 0;
+    const limit = 20; // Очень маленькая порция для виртуального хостинга
+    let hasMore = true;
+    
+    // Пагинация: загружаем товары порциями
+    while (hasMore) {
+      console.log(`Загрузка товаров: offset=${offset}, limit=${limit}`);
+      
+      try {
+        // Запрашиваем товары из МойСклад порциями
+        // Используем ADMIN API с images (только 1 картинка для экономии памяти)
+        // node-fetch не использует WebAssembly, поэтому проблем с памятью быть не должно
+        const response = await fetch(
+          `${ADMIN_API_URL}/api/remap/1.2/entity/product?limit=${limit}&offset=${offset}&expand=salePrices.priceType,images&images.limit=1`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Ошибка МойСклад:', response.status, errorText);
+          return res.status(response.status).json({ error: 'Ошибка МойСклад API', details: errorText });
+        }
+        
+        const data = await response.json();
+        const products = data.rows || [];
+        
+        console.log(`Получено ${products.length} товаров в этой пачке`);
+        
+        // Сохраняем каждый товар сразу, не накапливая в памяти
+        for (const product of products) {
+          const priceEntry = product.salePrices?.find(p => p.priceType?.name === 'Цена продажи');
+          const priceRub = priceEntry ? priceEntry.value / 100 : 0;
+          
+          // Получаем URL изображения из первой картинки
+          const imageUrl = product.images?.rows?.[0]?.miniature?.downloadHref || 
+                           product.images?.rows?.[0]?.tiny?.href || 
+                           null;
+          
+          await upsertProduct({
+            id: product.id,
+            name: product.name,
+            code: product.code || null,
+            description: product.description || null,
+            price_rub: priceRub,
+            image_url: imageUrl,
+            meta_href: product.meta?.href || null,
+            data: product // сохраняем полный объект для точности
+          });
+        }
+        
+        allProducts.push(...products);
+        
+        // Проверяем, есть ли еще товары
+        hasMore = products.length === limit;
+        offset += limit;
+        
+        // Пауза между запросами, чтобы не перегрузить память
+        if (hasMore) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+        
+      } catch (fetchError) {
+        console.error('Ошибка при загрузке пачки товаров:', fetchError);
+        // Если произошла ошибка памяти, прерываем цикл
+        hasMore = false;
+      }
+    }
+    
+    // Сохраняем токен и дату синхронизации
+    await setSetting('moysklad_token', token);
+    await setSetting('last_sync', new Date().toISOString());
+    
+    console.log(`✓ Синхронизация завершена: ${allProducts.length} товаров сохранено`);
+    
+    res.json({
+      success: true,
+      count: allProducts.length,
+      syncedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Ошибка синхронизации:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Получить статус синхронизации
+app.get('/admin/sync-status', async (req, res) => {
+  try {
+    const lastSync = await getSetting('last_sync');
+    const hasToken = !!(await getSetting('moysklad_token'));
+    const productsCount = (await getProducts()).length;
+    
+    res.json({
+      lastSync: lastSync ? new Date(lastSync).toISOString() : null,
+      hasToken,
+      productsCount
+    });
+  } catch (error) {
+    console.error('Ошибка получения статуса:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -296,6 +506,24 @@ async function createOrder(counterparty, customer, items, totalPrice) {
     console.error('Ошибка создания заказа:', error.message);
     throw error;
   }
+}
+
+// ======= STATIC (production) - ДОЛЖНО БЫТЬ В САМОМ КОНЦЕ =======
+// Отдаём статику и SPA fallback только после всех API роутов
+const distPath = path.resolve(process.cwd(), 'dist');
+if (fs.existsSync(distPath)) {
+  app.use(express.static(distPath));
+  
+  // SPA fallback - для всех не-API путей отдаём index.html
+  app.use((req, res, next) => {
+    // Пропускаем только API запросы
+    if (req.path.startsWith('/api')) {
+      return next();
+    }
+    // Для всех остальных путей (включая /admin) отдаём index.html
+    // React Router обработает клиентский роутинг
+    res.sendFile(path.join(distPath, 'index.html'));
+  });
 }
 
 const PORT = 3001;

@@ -5,11 +5,24 @@ export default defineConfig({
   plugins: [react()],
   server: {
     proxy: {
+      // Важно: фронтенд никогда не должен ходить напрямую в MoySklad.
+      // Всё идёт через Node-сервер, который подставляет Authorization.
       '/api_ms': {
-        target: 'https://api.moysklad.ru',
-        changeOrigin: true,  // Чтобы не было проблем с хостами
-        rewrite: (path) => path.replace(/^\/api_ms/, ''), // Преобразуем путь
-        secure: false, // Для работы с HTTPS
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false,
+      },
+
+      // Для админки и заказов — тоже на Node-сервер.
+      '/admin': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/api': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false,
       },
     },
   },

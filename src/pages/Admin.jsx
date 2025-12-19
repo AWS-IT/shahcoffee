@@ -2,137 +2,120 @@ import React, { useState, useEffect } from 'react'
 import '../styles/admin.css'
 
 export default function Admin() {
-  const [credentials, setCredentials] = useState({ email: '', password: '' })
-  const [hasCredentials, setHasCredentials] = useState(false)
-  const [currentEmail, setCurrentEmail] = useState('')
+  const [token, setToken] = useState('')
+  const [syncStatus, setSyncStatus] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [syncing, setSyncing] = useState(false)
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState('')
 
   useEffect(() => {
-    checkCredentialsStatus()
+    loadSyncStatus()
   }, [])
 
-  const checkCredentialsStatus = async () => {
+  const loadSyncStatus = async () => {
     try {
-      const response = await fetch('http://localhost:3001/admin/credentials-status')
+      const response = await fetch('/admin/sync-status')
       const data = await response.json()
-      setHasCredentials(data.hasCredentials)
-      if (data.email) {
-        setCurrentEmail(data.email)
-      }
+      setSyncStatus(data)
     } catch (error) {
-      console.error('Ошибка при проверке статуса:', error)
+      console.error('Ошибка при загрузке статуса:', error)
     }
   }
 
-  const handleChange = (e) => {
-    const { name, value } = e.target
-    setCredentials(prev => ({
-      ...prev,
-      [name]: value
-    }))
-  }
-
-  const handleSubmit = async (e) => {
+  const handleSync = async (e) => {
     e.preventDefault()
-    setLoading(true)
+    setSyncing(true)
     setMessage('')
 
-    if (!credentials.email || !credentials.password) {
+    if (!token) {
       setMessageType('error')
-      setMessage('Email и пароль обязательны')
-      setLoading(false)
+      setMessage('Введите API токен')
+      setSyncing(false)
       return
     }
 
     try {
-      const response = await fetch('http://localhost:3001/admin/set-credentials', {
+      const response = await fetch('/admin/sync-products', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(credentials)
+        body: JSON.stringify({ token })
       })
 
       const data = await response.json()
 
       if (response.ok) {
         setMessageType('success')
-        setMessage('✓ Credentials успешно сохранены!')
-        setCredentials({ email: '', password: '' })
-        setCurrentEmail(credentials.email)
-        setHasCredentials(true)
-        setTimeout(() => setMessage(''), 3000)
+        setMessage(`✓ Синхронизация завершена! Загружено ${data.count} товаров`)
+        setToken('')
+        loadSyncStatus()
+        setTimeout(() => setMessage(''), 5000)
       } else {
         setMessageType('error')
-        setMessage(data.error || 'Ошибка при сохранении')
+        setMessage(data.error || 'Ошибка синхронизации')
       }
     } catch (error) {
       setMessageType('error')
       setMessage('Ошибка подключения к серверу')
       console.error('Ошибка:', error)
     } finally {
-      setLoading(false)
+      setSyncing(false)
     }
+  }
+
+  const formatDate = (isoString) => {
+    if (!isoString) return 'Никогда'
+    const date = new Date(isoString)
+    return date.toLocaleString('ru-RU')
   }
 
   return (
     <div className="admin-page">
       <div className="admin-container">
-        <h1>Администратор - Настройка МойСклад</h1>
+        <h1>Администратор - Управление товарами</h1>
 
         <div className="admin-card">
           <div className="status-box">
-            <h3>Статус подключения</h3>
-            {hasCredentials ? (
-              <div className="status-success">
-                <p>✓ Credentials установлены</p>
-                <p>Email: <strong>{currentEmail}</strong></p>
-                <p>Можете обновить, введя новые данные ниже</p>
+            <h3>Статус синхронизации</h3>
+            {syncStatus ? (
+              <div className={syncStatus.productsCount > 0 ? 'status-success' : 'status-warning'}>
+                <p><strong>Товаров в базе:</strong> {syncStatus.productsCount}</p>
+                <p><strong>Последняя синхронизация:</strong> {formatDate(syncStatus.lastSync)}</p>
+                {syncStatus.hasToken ? (
+                  <p>✓ API токен сохранён</p>
+                ) : (
+                  <p>⚠️ Токен не сохранён, введите ниже</p>
+                )}
               </div>
             ) : (
               <div className="status-warning">
-                <p>⚠️ Credentials не установлены</p>
-                <p>Введите учетные данные МойСклад ниже</p>
+                <p>Загрузка...</p>
               </div>
             )}
           </div>
 
-          <form onSubmit={handleSubmit} className="admin-form">
-            <h2>{hasCredentials ? 'Обновить' : 'Установить'} учетные данные</h2>
+          <form onSubmit={handleSync} className="admin-form">
+            <h2>Синхронизация товаров из МойСклад</h2>
 
             <div className="form-group">
-              <label htmlFor="email">Email аккаунта МойСклад</label>
+              <label htmlFor="token">API Токен МойСклад</label>
               <input
-                type="email"
-                id="email"
-                name="email"
-                value={credentials.email}
-                onChange={handleChange}
-                placeholder="example@moysklad.ru"
-                disabled={loading}
-                required
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="password">Пароль</label>
-              <input
-                type="password"
-                id="password"
-                name="password"
-                value={credentials.password}
-                onChange={handleChange}
-                placeholder="••••••••"
-                disabled={loading}
+                type="text"
+                id="token"
+                name="token"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder="Вставьте API токен"
+                disabled={syncing}
                 required
               />
             </div>
 
             <p className="info-text">
-              ℹ️ Эти данные будут сохранены на сервере и автоматически использоваться для загрузки товаров.
-              Пользователи сайта не будут видеть окна входа.
+              ℹ️ Токен будет сохранён на сервере и использоваться для автоматической синхронизации.
+              Товары будут загружены в базу данных и отображаться на сайте без запросов к МойСклад.
             </p>
 
             {message && (
@@ -144,22 +127,24 @@ export default function Admin() {
             <button
               type="submit"
               className="btn-primary admin-btn"
-              disabled={loading}
+              disabled={syncing}
             >
-              {loading ? 'Сохранение...' : 'Сохранить'}
+              {syncing ? 'Синхронизация...' : 'Синхронизировать товары'}
             </button>
           </form>
         </div>
 
         <div className="info-section">
-          <h3>Как получить учетные данные?</h3>
+          <h3>Как получить API токен?</h3>
           <ol>
             <li>Откройте <a href="https://online.moysklad.ru" target="_blank" rel="noreferrer">МойСклад</a></li>
-            <li>Перейдите в профиль (правый верхний угол)</li>
-            <li>Выберите "Настройки"</li>
-            <li>Найдите раздел "API доступ" или "Интеграции"</li>
-            <li>Используйте свой email и пароль аккаунта</li>
+            <li>Перейдите в Настройки → Пользователи и права</li>
+            <li>Откройте вашего пользователя</li>
+            <li>Перейдите на вкладку "API"</li>
+            <li>Нажмите "Создать токен" (если токена нет)</li>
+            <li>Скопируйте токен и вставьте в форму выше</li>
           </ol>
+          <p><strong>Важно:</strong> Токен сохраняется на сервере, вводить нужно только один раз (или при смене токена).</p>
         </div>
       </div>
     </div>
