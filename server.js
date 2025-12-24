@@ -26,14 +26,15 @@ if (!PUBLIC_TOKEN) {
 
 // Прокси 
 app.use('/api_ms', async (req, res) => {
-  const url = `${PUBLIC_API_URL}/api/remap/1.2${req.path}${req.url.includes('?') ? '?' + req.url.split('?')[1] : ''}`;
+  // Используем приватный API для полного доступа к товарам и данным
+  const url = `${ADMIN_API_URL}/api/remap/1.2${req.path}${req.url.includes('?') ? '?' + req.url.split('?')[1] : ''}`;
 
   console.log(`\n📥 /api_ms${req.path} -> ${url}`);
-  console.log(`🔑 PUBLIC_TOKEN: ${PUBLIC_TOKEN ? `✓ присутствует (${PUBLIC_TOKEN.substring(0, 10)}...)` : '❌ ОТСУТСТВУЕТ'}`);
+  console.log(`🔑 TOKEN: ${PUBLIC_TOKEN ? `✓ присутствует (${PUBLIC_TOKEN.substring(0, 10)}...)` : '❌ ОТСУТСТВУЕТ'}`);
 
   if (!PUBLIC_TOKEN) {
-    console.error('❌ КРИТИЧЕСКАЯ ОШИБКА: PUBLIC_TOKEN не задан в .env!');
-    return res.status(500).json({ error: 'PUBLIC_TOKEN not configured' });
+    console.error('❌ КРИТИЧЕСКАЯ ОШИБКА: TOKEN не задан в .env!');
+    return res.status(500).json({ error: 'TOKEN not configured' });
   }
 
   try {
