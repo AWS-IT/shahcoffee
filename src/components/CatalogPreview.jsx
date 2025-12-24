@@ -47,7 +47,8 @@ export default function CatalogPreview() {
     const img = product.images?.rows?.[0];
     if (img?.miniature?.downloadHref) return img.miniature.downloadHref;
     if (img?.tiny?.href) return img.tiny.href;
-    return null; // Пусть браузер покажет broken image или CSS placeholder
+    if (img?.meta?.downloadHref) return img.meta.downloadHref;
+    return null;
   };
 
   if (loading) return <div className="catalog-loading">Загрузка...</div>

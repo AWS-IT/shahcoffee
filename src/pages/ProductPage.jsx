@@ -33,7 +33,7 @@ export default function ProductPage() {
     const rows = product.images?.rows
     if (rows && rows.length > 0) {
       const img = rows[0]
-      return img.miniature?.downloadHref || img.tiny?.href || null
+      return img.miniature?.downloadHref || img.tiny?.href || img.meta?.downloadHref || null
     }
     return null
   }
