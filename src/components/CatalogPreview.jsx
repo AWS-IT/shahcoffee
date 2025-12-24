@@ -6,11 +6,8 @@ export default function CatalogPreview() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('https://online.moysklad.ru/api/remap/1.2/entity/assortiment', {
-  method: 'GET',
-  headers: {
-    'Authorization': `Bearer ${process.env.MOYSKLAD_TOKEN}` 
-  }
+    fetch('/api_ms/entity/assortiment', {
+  method: 'GET'
 })
       .then(r => r.json())
       .then(data => {
