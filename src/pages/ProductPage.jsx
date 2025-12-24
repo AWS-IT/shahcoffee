@@ -10,7 +10,7 @@ export default function ProductPage() {
   const { addToCart } = useCart()
 
   useEffect(() => {
-    fetch(`/api/products/${id}?expand=images`)
+    fetch(`/api_ms/entity/product/${id}?expand=images`)
       .then(r => {
         if (!r.ok) throw new Error('Товар не найден')
         return r.json()

@@ -339,13 +339,15 @@ async function createOrGetCounterparty(customerData) {
 
 // Получение списка товаров
 app.get('/api/products', async (req, res) => {
-  console.log('📥 GET /api/products');
+  const query = req.url.includes('?') ? '?' + req.url.split('?')[1] : '';
+  console.log(`📥 GET /api/products${query}`);
   try {
-    const response = await fetch(`${PUBLIC_API_URL}/api/remap/1.2/entity/product`, {
+    const response = await fetch(`${ADMIN_API_URL}/api/remap/1.2/entity/product${query}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${PUBLIC_TOKEN}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json;charset=utf-8',
+        'Accept': 'application/json;charset=utf-8',
       }
     });
 
@@ -369,13 +371,15 @@ app.get('/api/products', async (req, res) => {
 // Получение товара по ID
 app.get('/api/products/:id', async (req, res) => {
   const { id } = req.params;
-  console.log(`📥 GET /api/products/${id}`);
+  const query = req.url.includes('?') ? '?' + req.url.split('?')[1] : '';
+  console.log(`📥 GET /api/products/${id}${query}`);
   try {
-    const response = await fetch(`${PUBLIC_API_URL}/api/remap/1.2/entity/product/${id}`, {
+    const response = await fetch(`${ADMIN_API_URL}/api/remap/1.2/entity/product/${id}${query}`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${PUBLIC_TOKEN}`,
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json;charset=utf-8',
+        'Accept': 'application/json;charset=utf-8',
       }
     });
 
