@@ -75,7 +75,8 @@ export default function CartPage() {
       // Создаём и отправляем форму POST на Robokassa с правильными параметрами
       const form = document.createElement('form')
       form.method = 'POST'
-      form.action = 'https://auth.robokassa.ru/Merchant/Index.aspx'
+      // Используем тестовый сервер для проверки: https://test.robokassa.ru/Merchant/Index.aspx
+      form.action = 'https://test.robokassa.ru/Merchant/Index.aspx'
       form.style.display = 'none'
       
       // MerchantLogin
