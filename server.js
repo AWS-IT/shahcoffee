@@ -29,8 +29,10 @@ app.use('/api_ms', async (req, res) => {
   // Используем приватный API для полного доступа к товарам и данным
   const url = `${ADMIN_API_URL}/api/remap/1.2${req.path}${req.url.includes('?') ? '?' + req.url.split('?')[1] : ''}`;
 
-  console.log(`\n📥 /api_ms${req.path} -> ${url}`);
-  console.log(`🔑 TOKEN: ${PUBLIC_TOKEN ? `✓ присутствует (${PUBLIC_TOKEN.substring(0, 10)}...)` : '❌ ОТСУТСТВУЕТ'}`);
+  console.log(`\n📥 Входящий запрос: ${req.method} /api_ms${req.path}`);
+  console.log(`🔗 Формируем URL: ${url}`);
+  console.log(`📋 Query string: ${req.url.includes('?') ? req.url.split('?')[1] : 'нет'}`);
+  console.log(`🔑 TOKEN: ${PUBLIC_TOKEN ? `✓ (${PUBLIC_TOKEN.substring(0, 15)}...)` : '❌ нет'}`);
 
   if (!PUBLIC_TOKEN) {
     console.error('❌ КРИТИЧЕСКАЯ ОШИБКА: TOKEN не задан в .env!');
@@ -38,12 +40,13 @@ app.use('/api_ms', async (req, res) => {
   }
 
   try {
+    console.log(`🚀 Отправляю запрос на МойСклад...`);
     const response = await fetch(url, {
       method: req.method,
       headers: {
         'Authorization': `Bearer ${PUBLIC_TOKEN}`, 
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        'Content-Type': 'application/json;charset=utf-8',
+        'Accept': 'application/json;charset=utf-8',
         'User-Agent': 'ShahCoffee/1.0',
       },
       body: req.method === 'GET' ? undefined : JSON.stringify(req.body),
@@ -53,13 +56,13 @@ app.use('/api_ms', async (req, res) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`❌ Ошибка МойСклад: ${response.status}`);
-      console.error(`📋 Ответ: ${errorText.substring(0, 300)}`);
+      console.error(`❌ Ошибка: ${response.status}`);
+      console.error(`📋 Тело: ${errorText.substring(0, 200)}`);
       return res.status(response.status).json({ error: `МойСклад: ${response.status} ${response.statusText}` });
     }
 
     const data = await response.json();
-    console.log(`✓ Успешно! Получено записей: ${data.rows?.length || 0}`);
+    console.log(`✓ Успешно получено: ${data.rows?.length || 0} записей`);
     
     res.status(response.status).json(data);
   } catch (e) {

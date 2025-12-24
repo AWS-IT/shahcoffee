@@ -6,7 +6,7 @@ export default function CatalogPreview() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api_ms/entity/assortiment', {
+    fetch('/api_ms/entity/product', {
   method: 'GET'
 })
       .then(r => r.json())
