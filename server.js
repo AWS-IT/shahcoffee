@@ -28,6 +28,9 @@ if (!PUBLIC_TOKEN) {
 app.use('/api_ms', async (req, res) => {
   const url = `${PUBLIC_API_URL}/api/remap/1.2${req.path}${req.url.includes('?') ? '?' + req.url.split('?')[1] : ''}`;
 
+  console.log(`📥 /api_ms${req.path} -> ${url}`);
+  console.log(`🔑 Token: ${PUBLIC_TOKEN ? '✓ присутствует' : '❌ отсутствует'}`);
+
   try {
     const response = await fetch(url, {
       method: req.method,
@@ -39,17 +42,22 @@ app.use('/api_ms', async (req, res) => {
       body: req.method === 'GET' ? undefined : JSON.stringify(req.body),
     });
 
+    console.log(`📤 МойСклад ответил: ${response.status}`);
+
     if (!response.ok) {
-      console.error(`Ошибка с запросом: ${response.status} - ${response.statusText}`);
-      return res.status(response.status).json({ error: 'Ошибка при обращении к MySklad' });
+      const errorText = await response.text();
+      console.error(`❌ Ошибка МойСклад: ${response.status} - ${response.statusText}`);
+      console.error(`📋 Тело ошибки: ${errorText.substring(0, 500)}`);
+      return res.status(response.status).json({ error: `МойСклад: ${response.status}` });
     }
 
     const data = await response.json();
+    console.log(`✓ Получено ${data.rows?.length || 'unknown'} товаров`);
     
     res.status(response.status).json(data);
   } catch (e) {
-    console.error('Ошибка проксирования:', e);
-    res.status(500).json({ error: 'Proxy error' });
+    console.error('❌ Ошибка проксирования:', e.message);
+    res.status(500).json({ error: 'Proxy error: ' + e.message });
   }
 });
 
@@ -321,6 +329,7 @@ async function createOrGetCounterparty(customerData) {
 
 // Получение списка товаров
 app.get('/api/products', async (req, res) => {
+  console.log('📥 GET /api/products');
   try {
     const response = await fetch(`${PUBLIC_API_URL}/api/remap/1.2/entity/product`, {
       method: 'GET',
@@ -330,22 +339,28 @@ app.get('/api/products', async (req, res) => {
       }
     });
 
+    console.log(`📤 МойСклад ответил: ${response.status}`);
+
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Ошибка: ${response.status} - ${errorText.substring(0, 500)}`);
       return res.status(response.status).json({ error: 'Ошибка при получении товаров' });
     }
 
     const data = await response.json();
+    console.log(`✓ Получено товаров: ${data.rows?.length || 0}`);
     res.json(data);
   } catch (error) {
-    console.error('Ошибка получения товаров:', error);
-    res.status(500).json({ error: 'Server error' });
+    console.error('❌ Ошибка получения товаров:', error.message);
+    res.status(500).json({ error: 'Server error: ' + error.message });
   }
 });
 
 // Получение товара по ID
 app.get('/api/products/:id', async (req, res) => {
+  const { id } = req.params;
+  console.log(`📥 GET /api/products/${id}`);
   try {
-    const { id } = req.params;
     const response = await fetch(`${PUBLIC_API_URL}/api/remap/1.2/entity/product/${id}`, {
       method: 'GET',
       headers: {
@@ -354,15 +369,20 @@ app.get('/api/products/:id', async (req, res) => {
       }
     });
 
+    console.log(`📤 МойСклад ответил: ${response.status}`);
+
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`❌ Ошибка: ${response.status} - ${errorText.substring(0, 500)}`);
       return res.status(response.status).json({ error: 'Товар не найден' });
     }
 
     const data = await response.json();
+    console.log(`✓ Товар получен: ${data.name}`);
     res.json(data);
   } catch (error) {
-    console.error('Ошибка получения товара:', error);
-    res.status(500).json({ error: 'Server error' });
+    console.error('❌ Ошибка получения товара:', error.message);
+    res.status(500).json({ error: 'Server error: ' + error.message });
   }
 });
 
