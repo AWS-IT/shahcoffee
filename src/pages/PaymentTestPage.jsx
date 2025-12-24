@@ -20,7 +20,7 @@ export default function PaymentTestPage() {
 
   const handleInitPayment = async () => {
     try {
-      const response = await fetch('/robokassa/init-payment', {
+      const response = await fetch('/api/robokassa/init-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -44,7 +44,7 @@ export default function PaymentTestPage() {
   const handleSimulatePaymentResult = async () => {
     try {
       // Тестирование результата платежа
-      const response = await fetch('/robokassa/result', {
+      const response = await fetch('/api/robokassa/result', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
