@@ -40,6 +40,19 @@ export default function CartPage() {
           amount: totalPrice.toFixed(2),
           description,
           customerEmail: formData.email,
+          // Отправляем данные заказа на сервер для создания отгрузки после оплаты
+          customerData: {
+            name: formData.name,
+            phone: formData.phone,
+            email: formData.email,
+            address: formData.address,
+          },
+          items: cart.map(item => ({
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            priceRub: item.priceRub,
+          })),
         }),
       })
 

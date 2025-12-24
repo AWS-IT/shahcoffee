@@ -62,6 +62,9 @@ if (!ROBOKASSA_MERCHANT_ID || !ROBOKASSA_PASS1 || !ROBOKASSA_PASS2) {
   console.error('ОШИБКА! Проверь .env файл для Robokassa');
 }
 
+// Временное хранилище заказов (в production лучше использовать Redis или БД)
+const pendingOrders = new Map();
+
 // Генерация подписи MD5
 function generateSignature(merchantId, sum, orderId, pass) {
   const sumStr = String(sum);
@@ -74,7 +77,7 @@ function generateSignature(merchantId, sum, orderId, pass) {
 
 // Инициирование платежа
 app.post('/api/robokassa/init-payment', (req, res) => {
-  const { orderId, amount, description, customerEmail } = req.body;
+  const { orderId, amount, description, customerEmail, customerData, items } = req.body;
 
   if (!orderId || !amount || !description) {
     return res.status(400).json({ error: 'Отсутствуют обязательные данные' });
@@ -82,6 +85,17 @@ app.post('/api/robokassa/init-payment', (req, res) => {
 
   const sum = Math.round(parseFloat(amount) * 100) / 100;
   const signature = generateSignature(ROBOKASSA_MERCHANT_ID, sum, orderId, ROBOKASSA_PASS1);
+
+  // Сохраняем данные заказа для последующего создания отгрузки
+  if (customerData && items) {
+    pendingOrders.set(orderId, {
+      customerData,
+      items,
+      totalPrice: sum,
+      createdAt: new Date(),
+    });
+    console.log(`✓ Заказ ${orderId} сохранен, ожидает оплаты`);
+  }
 
   console.log('=== Robokassa Init Payment ===');
   console.log('OrderId:', orderId);
@@ -122,7 +136,176 @@ function handleRobokassaResult(req, res) {
 
   const expectedSignature = generateSignature(ROBOKASSA_MERCHANT_ID, sumStr, OrderId, ROBOKASSA_PASS2);
 
-  console.log('Expected Signature:', expectedSignature);
+  // Получаем данные заказа из временного хранилища
+  const orderData = pendingOrders.get(OrderId);
+  
+  if (orderData) {
+    console.log(`📦 Создаем отгрузку в МойСклад для заказа ${OrderId}`);
+    
+    // Создаем отгрузку в МойСклад
+    createMoySkladShipment(OrderId, orderData)
+      .then(() => {
+        console.log(`✓ Отгрузка создана для заказа ${OrderId}`);
+        pendingOrders.delete(OrderId); // Удаляем из временного хранилища
+      })
+      .catch(err => {
+        console.error(`❌ Ошибка создания отгрузки для ${OrderId}:`, err);
+        // Не удаляем из хранилища - можно будет повторить позже
+      });
+  } else {
+    console.warn(`⚠️ Данные заказа ${OrderId} не найдены в хранилище`);
+  }
+  
+  res.json({ ok: true, message: 'Payment processed' });
+}
+
+// Функция создания отгрузки в МойСклад
+async function createMoySkladShipment(orderId, orderData) {
+  const { customerData, items, totalPrice } = orderData;
+  
+  try {
+    // 1. Создаем или находим контрагента
+    const counterparty = await createOrGetCounterparty(customerData);
+    
+    // 2. Получаем склад по умолчанию
+    const storesResponse = await fetch(`${ADMIN_API_URL}/api/remap/1.2/entity/store?limit=1`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${ADMIN_TOKEN}`,
+        'Content-Type': 'application/json',
+      }
+    });
+    
+    if (!storesResponse.ok) {
+      throw new Error('Ошибка при получении склада');
+    }
+    
+    const storesData = await storesResponse.json();
+    const store = storesData.rows?.[0];
+    
+    if (!store) {
+      throw new Error('Склад не найден');
+    }
+    
+    // 3. Получаем организацию
+    const orgResponse = await fetch(`${ADMIN_API_URL}/api/remap/1.2/entity/organization?limit=1`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${ADMIN_TOKEN}`,
+        'Content-Type': 'application/json',
+      }
+    });
+    
+    if (!orgResponse.ok) {
+      throw new Error('Ошибка при получении организации');
+    }
+    
+    const orgData = await orgResponse.json();
+    const organization = orgData.rows?.[0];
+    
+    if (!organization) {
+      throw new Error('Организация не найдена');
+    }
+    
+    // 4. Формируем позиции для отгрузки
+    const positions = items.map((item) => ({
+      quantity: item.quantity,
+      price: item.priceRub * 100, // МойСклад хранит цены в копейках
+      assortment: {
+        meta: {
+          href: `${ADMIN_API_URL}/api/remap/1.2/entity/product/${item.id}`,
+          type: 'product',
+          mediaType: 'application/json'
+        }
+      }
+    }));
+    
+    // 5. Создаем отгрузку
+    const shipmentPayload = {
+      name: `Заказ №${orderId}`,
+      description: `Оплачен через Robokassa\nТелефон: ${customerData.phone}\nАдрес: ${customerData.address}`,
+      agent: { meta: counterparty.meta },
+      organization: { meta: organization.meta },
+      store: { meta: store.meta },
+      positions: positions
+    };
+    
+    console.log('Отправка отгрузки в МойСклад:', JSON.stringify(shipmentPayload, null, 2));
+    
+    const shipmentResponse = await fetch(`${ADMIN_API_URL}/api/remap/1.2/entity/demand`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${ADMIN_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(shipmentPayload)
+    });
+    
+    if (!shipmentResponse.ok) {
+      const errorData = await shipmentResponse.json();
+      console.error('Ошибка МойСклад:', JSON.stringify(errorData, null, 2));
+      throw new Error('Ошибка МойСклад: ' + (errorData.errors?.[0]?.title || 'неизвестная ошибка'));
+    }
+    
+    const result = await shipmentResponse.json();
+    console.log('✓ Отгрузка создана:', result.name, result.id);
+    return result;
+    
+  } catch (error) {
+    console.error('Ошибка создания отгрузки:', error);
+    throw error;
+  }
+}
+
+// Функция создания/получения контрагента
+async function createOrGetCounterparty(customerData) {
+  try {
+    // Ищем контрагента по имени
+    const searchResponse = await fetch(
+      `${ADMIN_API_URL}/api/remap/1.2/entity/counterparty?filter=name=${encodeURIComponent(customerData.name)}&limit=1`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${ADMIN_TOKEN}`,
+          'Content-Type': 'application/json',
+        }
+      }
+    );
+    
+    const searchData = await searchResponse.json();
+    
+    if (searchData.rows && searchData.rows.length > 0) {
+      console.log('✓ Контрагент найден:', searchData.rows[0].name);
+      return searchData.rows[0];
+    }
+    
+    // Если не найден - создаем
+    const createResponse = await fetch(`${ADMIN_API_URL}/api/remap/1.2/entity/counterparty`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${ADMIN_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: customerData.name,
+        phone: customerData.phone,
+        email: customerData.email,
+        actualAddress: customerData.address,
+      })
+    });
+    
+    if (!createResponse.ok) {
+      throw new Error('Ошибка при создании контрагента');
+    }
+    
+    const newCounterparty = await createResponse.json();
+    console.log('✓ Контрагент создан:', newCounterparty.name);
+    return newCounterparty;
+    
+  } catch (error) {
+    console.error('Ошибка работы с контрагентом:', error);
+    throw error;
+  };
   console.log('Received Signature:', SignatureValue);
   console.log('Match:', expectedSignature.toLowerCase() === SignatureValue.toLowerCase());
 
