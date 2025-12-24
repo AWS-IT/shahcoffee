@@ -29,7 +29,7 @@ export default function CartPage() {
     setLoading(true)
 
     try {
-      const orderId = `${Date.now()}_${Math.random().toString().slice(2, 10)}`
+      const orderId = `${Date.now()}${Math.floor(Math.random() * 1000000)}`
       const description = `Заказ кофе на имя ${formData.name}`
 
       const response = await fetch('/api/robokassa/init-payment', {
