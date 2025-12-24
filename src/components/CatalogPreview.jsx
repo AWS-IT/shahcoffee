@@ -6,12 +6,14 @@ export default function CatalogPreview() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api_ms/entity/product?expand=images', {
+    fetch('/api_ms/entity/product?expand=images&limit=100', {
   method: 'GET'
 })
       .then(r => r.json())
       .then(data => {
-        console.log(data.rows[0]?.images) 
+        console.log('📦 Товары загружены:', data.rows?.length);
+        console.log('1️⃣ Первый товар:', data.rows[0]);
+        console.log('Изображение 1го:', data.rows[0]?.images?.rows?.[0]);
         setProducts(data.rows || [])
       })
       .catch(console.error)
