@@ -69,11 +69,55 @@ export default function CartPage() {
         totalPrice,
       }))
 
-      // Создаём и отправляем форму POST на Robokassa
+      // Создаём и отправляем форму POST на Robokassa с правильными параметрами
       const form = document.createElement('form')
       form.method = 'POST'
-      form.action = `https://auth.robokassa.ru/Merchant/Index/${paymentData.merchantId}/${paymentData.sum}/${paymentData.orderId}/${paymentData.signature}`
+      form.action = 'https://auth.robokassa.ru/Merchant/Index.aspx'
       form.style.display = 'none'
+      
+      // MerchantLogin
+      const merchantInput = document.createElement('input')
+      merchantInput.type = 'hidden'
+      merchantInput.name = 'MerchantLogin'
+      merchantInput.value = paymentData.merchantId
+      form.appendChild(merchantInput)
+      
+      // OutSum
+      const sumInput = document.createElement('input')
+      sumInput.type = 'hidden'
+      sumInput.name = 'OutSum'
+      sumInput.value = paymentData.sum
+      form.appendChild(sumInput)
+      
+      // InvId
+      const invIdInput = document.createElement('input')
+      invIdInput.type = 'hidden'
+      invIdInput.name = 'InvId'
+      invIdInput.value = paymentData.orderId
+      form.appendChild(invIdInput)
+      
+      // Description
+      const descInput = document.createElement('input')
+      descInput.type = 'hidden'
+      descInput.name = 'Description'
+      descInput.value = paymentData.description
+      form.appendChild(descInput)
+      
+      // SignatureValue
+      const signInput = document.createElement('input')
+      signInput.type = 'hidden'
+      signInput.name = 'SignatureValue'
+      signInput.value = paymentData.signature
+      form.appendChild(signInput)
+      
+      // Email (optional)
+      if (paymentData.customerEmail) {
+        const emailInput = document.createElement('input')
+        emailInput.type = 'hidden'
+        emailInput.name = 'Email'
+        emailInput.value = paymentData.customerEmail
+        form.appendChild(emailInput)
+      }
       
       document.body.appendChild(form)
       form.submit()
