@@ -85,7 +85,8 @@ const pendingOrders = new Map();
 
 // Генерация подписи MD5
 function generateSignature(merchantId, sum, orderId, pass) {
-  const sumStr = String(sum);
+  // Сумма должна быть целым числом (без дробной части)
+  const sumStr = String(Math.round(sum));
   const signatureString = `${merchantId}:${sumStr}:${orderId}:${pass}`;
   console.log('Signature generation string:', signatureString);
   const hash = crypto.createHash('md5').update(signatureString).digest('hex');
@@ -101,7 +102,8 @@ app.post('/api/robokassa/init-payment', (req, res) => {
     return res.status(400).json({ error: 'Отсутствуют обязательные данные' });
   }
 
-  const sum = Math.round(parseFloat(amount) * 100) / 100;
+  // Robokassa требует целое число рублей (если передано число с дробью, округляем)
+  const sum = Math.round(parseFloat(amount));
   const signature = generateSignature(ROBOKASSA_MERCHANT_ID, sum, orderId, ROBOKASSA_PASS1);
 
   // Сохраняем данные заказа для последующего создания отгрузки
@@ -121,6 +123,22 @@ app.post('/api/robokassa/init-payment', (req, res) => {
   console.log('Sum (normalized):', sum);
   console.log('Signature:', signature);
 
+  // Robokassa требует HTML форму с методом POST
+  const htmlForm = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <title>Перенаправление на оплату...</title>
+    </head>
+    <body onload="document.paymentForm.submit()">
+      <form name="paymentForm" method="POST" action="https://auth.robokassa.ru/Merchant/Index/${ROBOKASSA_MERCHANT_ID}/${sum}/${orderId}/${signature}">
+        <p>Перенаправляем вас на страницу оплаты...</p>
+      </form>
+    </body>
+    </html>
+  `;
+
   res.json({
     merchantId: ROBOKASSA_MERCHANT_ID,
     orderId,
@@ -128,7 +146,7 @@ app.post('/api/robokassa/init-payment', (req, res) => {
     description,
     signature,
     customerEmail: customerEmail || '',
-    redirectUrl: `https://auth.robokassa.ru/Merchant/Index/${ROBOKASSA_MERCHANT_ID}/${sum}/${orderId}/${signature}`
+    htmlForm
   });
 });
 
@@ -143,17 +161,12 @@ function handleRobokassaResult(req, res) {
   console.log('Sum:', Sum);
   console.log('SignatureValue:', SignatureValue);
 
-  let sumStr = String(Sum).replace(',', '.').trim();
-  
-  if (sumStr.includes('.') && sumStr.endsWith('00')) {
-    const [intPart, decPart] = sumStr.split('.');
-    if (decPart === '00') {
-      sumStr = intPart;
-    }
-  }
+  // Приводим сумму к целому числу для проверки подписи
+  const sumForSignature = String(Math.round(parseFloat(Sum)));
 
-  const expectedSignature = generateSignature(ROBOKASSA_MERCHANT_ID, sumStr, OrderId, ROBOKASSA_PASS2);
+  const expectedSignature = generateSignature(ROBOKASSA_MERCHANT_ID, sumForSignature, OrderId, ROBOKASSA_PASS2);
 
+  console.log('Sum for signature:', sumForSignature);
   console.log('Expected Signature:', expectedSignature);
   console.log('Received Signature:', SignatureValue);
   console.log('Match:', expectedSignature.toLowerCase() === SignatureValue.toLowerCase());

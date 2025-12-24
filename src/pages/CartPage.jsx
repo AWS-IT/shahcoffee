@@ -69,7 +69,12 @@ export default function CartPage() {
         totalPrice,
       }))
 
-      window.location.href = paymentData.redirectUrl
+      // Отправляем HTML форму для оплаты
+      const iframe = document.createElement('iframe')
+      iframe.style.display = 'none'
+      document.body.appendChild(iframe)
+      iframe.contentDocument.write(paymentData.htmlForm)
+      iframe.contentDocument.close()
     } catch (err) {
       console.error('Ошибка оформления заказа:', err)
       setError(err.message || 'Ошибка при оформлении заказа')
