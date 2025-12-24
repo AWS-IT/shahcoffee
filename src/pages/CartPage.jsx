@@ -75,8 +75,7 @@ export default function CartPage() {
       // Создаём и отправляем форму POST на Robokassa с правильными параметрами
       const form = document.createElement('form')
       form.method = 'POST'
-      // Используем тестовый сервер для проверки: https://test.robokassa.ru/Merchant/Index.aspx
-      form.action = 'https://test.robokassa.ru/Merchant/Index.aspx'
+      form.action = 'https://auth.robokassa.ru/Merchant/Index.aspx'
       form.style.display = 'none'
       
       // MerchantLogin
@@ -122,13 +121,6 @@ export default function CartPage() {
         emailInput.value = paymentData.customerEmail
         form.appendChild(emailInput)
       }
-      
-      // IsTest - используем тестовый режим для проверки
-      const isTestInput = document.createElement('input')
-      isTestInput.type = 'hidden'
-      isTestInput.name = 'IsTest'
-      isTestInput.value = '1' // 1 = тестовый режим
-      form.appendChild(isTestInput)
       
       console.log('📤 Отправка формы на Robokassa:', {
         MerchantLogin: paymentData.merchantId,
