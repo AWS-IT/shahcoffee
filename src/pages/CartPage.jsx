@@ -122,11 +122,11 @@ export default function CartPage() {
         form.appendChild(emailInput)
       }
       
-      // IsTest - если нужно использовать тестовые платежи
+      // IsTest - используем тестовый режим для проверки
       const isTestInput = document.createElement('input')
       isTestInput.type = 'hidden'
       isTestInput.name = 'IsTest'
-      isTestInput.value = '0' // 1 = тестовый режим, 0 = боевой
+      isTestInput.value = '1' // 1 = тестовый режим
       form.appendChild(isTestInput)
       
       console.log('📤 Отправка формы на Robokassa:', {
