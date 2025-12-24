@@ -43,7 +43,8 @@ app.use('/api_ms', async (req, res) => {
       headers: {
         'Authorization': `Bearer ${PUBLIC_TOKEN}`, 
         'Content-Type': 'application/json',
-        'Accept-Encoding': 'gzip',
+        'Accept': 'application/json',
+        'User-Agent': 'ShahCoffee/1.0',
       },
       body: req.method === 'GET' ? undefined : JSON.stringify(req.body),
     });
