@@ -136,6 +136,17 @@ function handleRobokassaResult(req, res) {
 
   const expectedSignature = generateSignature(ROBOKASSA_MERCHANT_ID, sumStr, OrderId, ROBOKASSA_PASS2);
 
+  console.log('Expected Signature:', expectedSignature);
+  console.log('Received Signature:', SignatureValue);
+  console.log('Match:', expectedSignature.toLowerCase() === SignatureValue.toLowerCase());
+
+  if (SignatureValue.toLowerCase() !== expectedSignature.toLowerCase()) {
+    console.error('❌ Ошибка подписи Robokassa!');
+    return res.status(403).json({ error: 'Signature mismatch' });
+  }
+
+  console.log(`✓ Платеж подтвержден. Заказ: ${OrderId}, Сумма: ${Sum}`);
+  
   // Получаем данные заказа из временного хранилища
   const orderData = pendingOrders.get(OrderId);
   
@@ -305,19 +316,55 @@ async function createOrGetCounterparty(customerData) {
   } catch (error) {
     console.error('Ошибка работы с контрагентом:', error);
     throw error;
-  };
-  console.log('Received Signature:', SignatureValue);
-  console.log('Match:', expectedSignature.toLowerCase() === SignatureValue.toLowerCase());
-
-  if (SignatureValue.toLowerCase() !== expectedSignature.toLowerCase()) {
-    console.error('❌ Ошибка подписи Robokassa!');
-    return res.status(403).json({ error: 'Signature mismatch' });
   }
-
-  console.log(`✓ Платеж подтвержден. Заказ: ${OrderId}, Сумма: ${Sum}`);
-  
-  res.json({ ok: true, message: 'Payment processed' });
 }
+
+// Получение списка товаров
+app.get('/api/products', async (req, res) => {
+  try {
+    const response = await fetch(`${PUBLIC_API_URL}/api/remap/1.2/entity/product`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${PUBLIC_TOKEN}`,
+        'Content-Type': 'application/json',
+      }
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'Ошибка при получении товаров' });
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error('Ошибка получения товаров:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Получение товара по ID
+app.get('/api/products/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const response = await fetch(`${PUBLIC_API_URL}/api/remap/1.2/entity/product/${id}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${PUBLIC_TOKEN}`,
+        'Content-Type': 'application/json',
+      }
+    });
+
+    if (!response.ok) {
+      return res.status(response.status).json({ error: 'Товар не найден' });
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error('Ошибка получения товара:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
 app.post('/api/robokassa/result', handleRobokassaResult);
 app.get('/api/robokassa/result', handleRobokassaResult);
