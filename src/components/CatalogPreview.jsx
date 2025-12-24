@@ -6,7 +6,7 @@ export default function CatalogPreview() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api_ms/entity/product', {
+    fetch('/api_ms/entity/product?expand=images', {
   method: 'GET'
 })
       .then(r => r.json())
@@ -44,13 +44,11 @@ export default function CatalogPreview() {
   }
 
   const getImageUrl = (product) => {
-  const img = product.images?.rows?.[0];
-  if (img?.miniature?.downloadHref) return img.miniature.downloadHref;
-  if (img?.tiny?.href) return img.tiny.href;
-
-  // ← ЭТО РАБОТАЕТ ВСЕГДА
-  return `https://placehold.co/800x800/eeeeee/666666/png?text=${encodeURIComponent(product.name.slice(0, 18))}&font=roboto`;
-};
+    const img = product.images?.rows?.[0];
+    if (img?.miniature?.downloadHref) return img.miniature.downloadHref;
+    if (img?.tiny?.href) return img.tiny.href;
+    return null; // Пусть браузер покажет broken image или CSS placeholder
+  };
 
   if (loading) return <div className="catalog-loading">Загрузка...</div>
 

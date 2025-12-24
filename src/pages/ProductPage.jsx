@@ -10,7 +10,7 @@ export default function ProductPage() {
   const { addToCart } = useCart()
 
   useEffect(() => {
-    fetch(`/api/products/${id}`)
+    fetch(`/api/products/${id}?expand=images`)
       .then(r => {
         if (!r.ok) throw new Error('Товар не найден')
         return r.json()
@@ -38,8 +38,7 @@ export default function ProductPage() {
     return null
   }
 
-  const imageUrl = getMainImage() ||
-    `https://via.placeholder.com/400x400/f5f5f5/999999?text=${encodeURIComponent(product.name.substring(0, 20))}`
+  const imageUrl = getMainImage();
 
   const waText = encodeURIComponent(
     `Заказ с сайта ШАХ:\n${product.name}\nКоличество: ${quantity} уп.\nСумма: ${totalPrice.toLocaleString('ru-RU')} ₽\nАртикул: ${product.code || '-'}\n\nПрошу выставить счёт`
