@@ -13,14 +13,14 @@ app.get('/health', (req, res) => {
 });
 
 // Публичный токен
-const PUBLIC_TOKEN = process.env.MOYSKLAD_PUBLIC_TOKEN;
-const ADMIN_TOKEN = process.env.MOYSKLAD_TOKEN;
+const PUBLIC_TOKEN = process.env.VITE_MOYSKLAD_TOKEN;
+const ADMIN_TOKEN = process.env.VITE_MOYSKLAD_TOKEN;
 const PUBLIC_API_URL = 'https://b2b.moysklad.ru';
 const ADMIN_API_URL = 'https://api.moysklad.ru';
 
 if (!PUBLIC_TOKEN) {
   console.error('ОШИБКА! Проверь .env файл:');
-  console.error('MOYSKLAD_PUBLIC_TOKEN=твой_публичный_токен');
+  console.error('VITE_MOYSKLAD_TOKEN=твой_токен');
   process.exit(1);
 }
 
@@ -28,8 +28,13 @@ if (!PUBLIC_TOKEN) {
 app.use('/api_ms', async (req, res) => {
   const url = `${PUBLIC_API_URL}/api/remap/1.2${req.path}${req.url.includes('?') ? '?' + req.url.split('?')[1] : ''}`;
 
-  console.log(`📥 /api_ms${req.path} -> ${url}`);
-  console.log(`🔑 Token: ${PUBLIC_TOKEN ? '✓ присутствует' : '❌ отсутствует'}`);
+  console.log(`\n📥 /api_ms${req.path} -> ${url}`);
+  console.log(`🔑 PUBLIC_TOKEN: ${PUBLIC_TOKEN ? `✓ присутствует (${PUBLIC_TOKEN.substring(0, 10)}...)` : '❌ ОТСУТСТВУЕТ'}`);
+
+  if (!PUBLIC_TOKEN) {
+    console.error('❌ КРИТИЧЕСКАЯ ОШИБКА: PUBLIC_TOKEN не задан в .env!');
+    return res.status(500).json({ error: 'PUBLIC_TOKEN not configured' });
+  }
 
   try {
     const response = await fetch(url, {
@@ -42,17 +47,17 @@ app.use('/api_ms', async (req, res) => {
       body: req.method === 'GET' ? undefined : JSON.stringify(req.body),
     });
 
-    console.log(`📤 МойСклад ответил: ${response.status}`);
+    console.log(`📤 МойСклад ответил: ${response.status} ${response.statusText}`);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`❌ Ошибка МойСклад: ${response.status} - ${response.statusText}`);
-      console.error(`📋 Тело ошибки: ${errorText.substring(0, 500)}`);
-      return res.status(response.status).json({ error: `МойСклад: ${response.status}` });
+      console.error(`❌ Ошибка МойСклад: ${response.status}`);
+      console.error(`📋 Ответ: ${errorText.substring(0, 300)}`);
+      return res.status(response.status).json({ error: `МойСклад: ${response.status} ${response.statusText}` });
     }
 
     const data = await response.json();
-    console.log(`✓ Получено ${data.rows?.length || 'unknown'} товаров`);
+    console.log(`✓ Успешно! Получено записей: ${data.rows?.length || 0}`);
     
     res.status(response.status).json(data);
   } catch (e) {
