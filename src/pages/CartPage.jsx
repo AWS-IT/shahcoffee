@@ -29,7 +29,10 @@ export default function CartPage() {
     setLoading(true)
 
     try {
-      const orderId = `${Date.now()}${Math.floor(Math.random() * 1000000)}`
+      // InvId в Robokassa должен быть компактным - используем только последние 10 цифр timestamp + 3 случайные
+      const timestamp = Date.now().toString().slice(-10)
+      const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
+      const orderId = `${timestamp}${random}`
       const description = `Заказ кофе на имя ${formData.name}`
 
       const response = await fetch('/api/robokassa/init-payment', {
@@ -118,6 +121,20 @@ export default function CartPage() {
         emailInput.value = paymentData.customerEmail
         form.appendChild(emailInput)
       }
+      
+      // IsTest - если нужно использовать тестовые платежи
+      const isTestInput = document.createElement('input')
+      isTestInput.type = 'hidden'
+      isTestInput.name = 'IsTest'
+      isTestInput.value = '0' // 1 = тестовый режим, 0 = боевой
+      form.appendChild(isTestInput)
+      
+      console.log('📤 Отправка формы на Robokassa:', {
+        MerchantLogin: paymentData.merchantId,
+        OutSum: paymentData.sum,
+        InvId: paymentData.orderId,
+        SignatureValue: paymentData.signature
+      })
       
       document.body.appendChild(form)
       form.submit()
