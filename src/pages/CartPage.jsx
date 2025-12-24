@@ -32,7 +32,7 @@ export default function CartPage() {
       const orderId = `${Date.now()}_${Math.random().toString().slice(2, 10)}`
       const description = `Заказ кофе на имя ${formData.name}`
 
-      const response = await fetch('http://localhost:3001/robokassa/init-payment', {
+      const response = await fetch('/robokassa/init-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
