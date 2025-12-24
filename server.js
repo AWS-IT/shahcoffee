@@ -123,22 +123,6 @@ app.post('/api/robokassa/init-payment', (req, res) => {
   console.log('Sum (normalized):', sum);
   console.log('Signature:', signature);
 
-  // Robokassa требует HTML форму с методом POST
-  const htmlForm = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <title>Перенаправление на оплату...</title>
-    </head>
-    <body onload="document.paymentForm.submit()">
-      <form name="paymentForm" method="POST" action="https://auth.robokassa.ru/Merchant/Index/${ROBOKASSA_MERCHANT_ID}/${sum}/${orderId}/${signature}">
-        <p>Перенаправляем вас на страницу оплаты...</p>
-      </form>
-    </body>
-    </html>
-  `;
-
   res.json({
     merchantId: ROBOKASSA_MERCHANT_ID,
     orderId,
@@ -146,7 +130,6 @@ app.post('/api/robokassa/init-payment', (req, res) => {
     description,
     signature,
     customerEmail: customerEmail || '',
-    htmlForm
   });
 });
 
