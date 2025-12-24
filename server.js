@@ -73,7 +73,7 @@ function generateSignature(merchantId, sum, orderId, pass) {
 }
 
 // Инициирование платежа
-app.post('/robokassa/init-payment', (req, res) => {
+app.post('/api/robokassa/init-payment', (req, res) => {
   const { orderId, amount, description, customerEmail } = req.body;
 
   if (!orderId || !amount || !description) {
@@ -136,8 +136,8 @@ function handleRobokassaResult(req, res) {
   res.json({ ok: true, message: 'Payment processed' });
 }
 
-app.post('/robokassa/result', handleRobokassaResult);
-app.get('/robokassa/result', handleRobokassaResult);
+app.post('/api/robokassa/result', handleRobokassaResult);
+app.get('/api/robokassa/result', handleRobokassaResult);
 
 const PORT = 3001;
 app.listen(PORT, () => {
