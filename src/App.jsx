@@ -1,13 +1,12 @@
-import React from 'react'
 import { Routes, Route, useLocation } from 'react-router-dom'
 import Header from './components/Header.jsx'
 import Footer from './components/Footer.jsx'
-import CartPage from './pages/CartPage.jsx'
-import PaymentResultPage from './pages/PaymentResultPage.jsx'
-import PaymentTestPage from './pages/PaymentTestPage.jsx'
 import Home from './pages/Home.jsx'
 import CatalogPage from './pages/CatalogPage.jsx'
 import AboutPage from './pages/AboutPage.jsx'
+import CartPage from './pages/CartPage.jsx'
+import PaymentResultPage from './pages/PaymentResultPage.jsx'
+import PaymentTestPage from './pages/PaymentTestPage.jsx'
 import ProductPage from './pages/ProductPage.jsx'
 
 export default function App() {

@@ -10,8 +10,7 @@ export default function ProductPage() {
   const { addToCart } = useCart()
 
   useEffect(() => {
-    // Главный трюк: &images.limit=20 — заставляет МойСклад вернуть rows с изображениями
-    fetch(`/api_ms/api/remap/1.2/entity/product/${id}?expand=salePrices.priceType,images&images.limit=20`)
+    fetch(`/api/products/${id}`)
       .then(r => {
         if (!r.ok) throw new Error('Товар не найден')
         return r.json()

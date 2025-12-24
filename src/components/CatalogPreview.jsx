@@ -18,6 +18,23 @@ export default function CatalogPreview() {
       .finally(() => setLoading(false))
   }, [])
 
+  const loadProducts = async () => {
+    try {
+      const response = await fetch('/api/products')
+      const data = await response.json()
+      
+      if (response.ok && data.rows) {
+        setProducts(data.rows || [])
+      } else {
+        console.error('Ошибка загрузки товаров:', data)
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки товаров:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const getPrice = (product) => {
     const price = product.salePrices?.find(p => p.priceType?.name === 'Цена продажи')
     if (!price) return { main: 'По запросу' }
