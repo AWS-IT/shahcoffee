@@ -7,6 +7,7 @@ dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // Для form-data от Robokassa
 
 app.get('/health', (req, res) => {
   res.json({ ok: true });
@@ -139,15 +140,26 @@ app.post('/api/robokassa/init-payment', (req, res) => {
 // Обработка уведомления от Robokassa
 function handleRobokassaResult(req, res) {
   const data = req.method === 'POST' ? req.body : req.query;
-  const { OrderId, Sum, SignatureValue } = data;
-
+  
   console.log('\n=== Robokassa Result Callback ===');
   console.log('Method:', req.method);
-  console.log('OrderId:', OrderId);
-  console.log('Sum:', Sum);
+  console.log('Raw data:', data);
+  
+  if (!data || !data.InvId) {
+    console.error('❌ Нет данных от Robokassa');
+    return res.status(400).send('Bad request');
+  }
+  
+  // Robokassa использует InvId, не OrderId
+  const OrderId = data.InvId;
+  const Sum = data.OutSum;
+  const SignatureValue = data.SignatureValue;
+
+  console.log('OrderId (InvId):', OrderId);
+  console.log('Sum (OutSum):', Sum);
   console.log('SignatureValue:', SignatureValue);
 
-  // Приводим сумму к целому числу для проверки подписи
+  // Приводим сумму к тому же формату что при генерации
   const sumForSignature = String(Math.round(parseFloat(Sum)));
 
   const expectedSignature = generateSignature(ROBOKASSA_MERCHANT_ID, sumForSignature, OrderId, ROBOKASSA_PASS2);
@@ -159,7 +171,7 @@ function handleRobokassaResult(req, res) {
 
   if (SignatureValue.toLowerCase() !== expectedSignature.toLowerCase()) {
     console.error('❌ Ошибка подписи Robokassa!');
-    return res.status(403).json({ error: 'Signature mismatch' });
+    return res.status(403).send('Signature mismatch');
   }
 
   console.log(`✓ Платеж подтвержден. Заказ: ${OrderId}, Сумма: ${Sum}`);
@@ -184,7 +196,8 @@ function handleRobokassaResult(req, res) {
     console.warn(`⚠️ Данные заказа ${OrderId} не найдены в хранилище`);
   }
   
-  res.json({ ok: true, message: 'Payment processed' });
+  // Robokassa ожидает ответ OK{InvId}
+  res.send(`OK${OrderId}`);
 }
 
 // Функция создания отгрузки в МойСклад
