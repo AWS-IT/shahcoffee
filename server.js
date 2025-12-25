@@ -86,14 +86,8 @@ const pendingOrders = new Map();
 
 // Генерация подписи MD5
 function generateSignature(merchantId, sum, orderId, pass) {
-  // Robokassa: сумма с копейками, формат X.XX или X (если целое)
-  let sumStr;
-  const sumNum = parseFloat(sum);
-  if (Number.isInteger(sumNum)) {
-    sumStr = String(sumNum);
-  } else {
-    sumStr = sumNum.toFixed(2);
-  }
+  // Robokassa: сумма как строка, формат X или X.XX
+  const sumStr = String(sum);
   const signatureString = `${merchantId}:${sumStr}:${orderId}:${pass}`;
   console.log('Signature generation string:', signatureString);
   const hash = crypto.createHash('md5').update(signatureString).digest('hex');
@@ -109,10 +103,13 @@ app.post('/api/robokassa/init-payment', (req, res) => {
     return res.status(400).json({ error: 'Отсутствуют обязательные данные' });
   }
 
-  // Robokassa принимает сумму с копейками
+  // Robokassa: сумма с копейками, минимум 1 рубль
   const sumNum = parseFloat(amount);
-  // Формат: целое число или с двумя знаками после точки
-  const sum = Number.isInteger(sumNum) ? sumNum : parseFloat(sumNum.toFixed(2));
+  if (sumNum < 1) {
+    return res.status(400).json({ error: 'Минимальная сумма заказа 1 рубль' });
+  }
+  // Формат суммы: целое или с двумя знаками
+  const sum = Number.isInteger(sumNum) ? String(sumNum) : sumNum.toFixed(2);
   const signature = generateSignature(ROBOKASSA_MERCHANT_ID, sum, orderId, ROBOKASSA_PASS1);
 
   // Сохраняем данные заказа для последующего создания отгрузки
@@ -129,10 +126,9 @@ app.post('/api/robokassa/init-payment', (req, res) => {
   console.log('=== Robokassa Init Payment ===');
   console.log('OrderId:', orderId);
   console.log('Amount (input):', amount);
-  console.log('Sum (normalized):', sum);
+  console.log('Sum (formatted):', sum);
   console.log('Signature:', signature);
 
-  // Отправляем сумму как целое число
   res.json({
     merchantId: ROBOKASSA_MERCHANT_ID,
     orderId,
@@ -165,9 +161,16 @@ function handleRobokassaResult(req, res) {
   console.log('Sum (OutSum):', Sum);
   console.log('SignatureValue:', SignatureValue);
 
-  // Используем сумму как есть от Robokassa (она уже в правильном формате)
-  const expectedSignature = generateSignature(ROBOKASSA_MERCHANT_ID, Sum, OrderId, ROBOKASSA_PASS2);
+  // Robokassa присылает сумму в формате "1.000000", нужно использовать как есть
+  // Убираем trailing zeros для подписи
+  let sumForSignature = parseFloat(Sum);
+  sumForSignature = Number.isInteger(sumForSignature) 
+    ? String(sumForSignature) 
+    : sumForSignature.toFixed(2);
+  
+  const expectedSignature = generateSignature(ROBOKASSA_MERCHANT_ID, sumForSignature, OrderId, ROBOKASSA_PASS2);
 
+  console.log('Sum for signature:', sumForSignature);
   console.log('Expected Signature:', expectedSignature);
   console.log('Received Signature:', SignatureValue);
   console.log('Match:', expectedSignature.toLowerCase() === SignatureValue.toLowerCase());

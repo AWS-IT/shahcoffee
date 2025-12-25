@@ -1,19 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useCart } from '../context/CartContext';
 
 export default function PaymentResultPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { clearCart } = useCart();
   const [status, setStatus] = useState('processing'); // processing, success, error
   const [orderData, setOrderData] = useState(null);
   const [message, setMessage] = useState('Обработка платежа...');
 
   useEffect(() => {
-    // Получаем параметры из URL
-    const orderId = searchParams.get('OrderId');
-    const invoiceId = searchParams.get('InvId');
+    // Robokassa отправляет: InvId, OutSum, SignatureValue, Culture
+    const invId = searchParams.get('InvId');
+    const outSum = searchParams.get('OutSum');
     const signatureValue = searchParams.get('SignatureValue');
-    const isFail = searchParams.get('fail');
+
+    console.log('Payment result params:', { invId, outSum, signatureValue });
 
     // Получаем сохраненные данные заказа из localStorage
     const pendingOrder = localStorage.getItem('pendingOrder');
@@ -21,50 +24,20 @@ export default function PaymentResultPage() {
       setOrderData(JSON.parse(pendingOrder));
     }
 
-    // Если это ошибка платежа
-    if (isFail === '1') {
-      setStatus('error');
-      setMessage('Платеж не прошел. Пожалуйста, попробуйте еще раз.');
-      return;
-    }
-
-    if (orderId && signatureValue) {
-      // Отправляем запрос на сервер для подтверждения платежа
-      confirmPayment(orderId, signatureValue, invoiceId);
-    } else {
-      setStatus('error');
-      setMessage('Не получены данные платежа. Пожалуйста, свяжитесь с поддержкой.');
-    }
-  }, [searchParams]);
-
-  const confirmPayment = async (orderId, signatureValue, invoiceId) => {
-    try {
-      const response = await fetch('http://localhost:3001/robokassa/result', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          OrderId: orderId,
-          InvId: invoiceId,
-          SignatureValue: signatureValue,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Ошибка при обработке платежа');
-      }
-
-      // Платеж успешно обработан
+    // Если есть InvId и SignatureValue - платёж успешен (Robokassa так перенаправляет только успешные)
+    if (invId && signatureValue) {
       setStatus('success');
       setMessage('Платеж успешно обработан! Спасибо за ваш заказ.');
       
-      // Очищаем localStorage
+      // Очищаем корзину и localStorage
+      clearCart();
       localStorage.removeItem('pendingOrder');
-    } catch (error) {
-      console.error('Ошибка подтверждения платежа:', error);
+    } else {
+      // Если нет параметров - возможно это ошибка или прямой заход
       setStatus('error');
-      setMessage('Ошибка при обработке платежа. Пожалуйста, свяжитесь с поддержкой.');
+      setMessage('Не получены данные платежа. Пожалуйста, свяжитесь с поддержкой.');
     }
-  };
+  }, [searchParams, clearCart]);
 
   return (
     <section className="payment-result-page">
