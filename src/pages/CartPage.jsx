@@ -29,10 +29,8 @@ export default function CartPage() {
     setLoading(true)
 
     try {
-      // InvId в Robokassa должен быть компактным - используем только последние 10 цифр timestamp + 3 случайные
-      const timestamp = Date.now().toString().slice(-10)
-      const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0')
-      const orderId = `${timestamp}${random}`
+      // InvId должен быть коротким числом (до 9 цифр)
+      const orderId = String(Math.floor(Date.now() / 1000) % 1000000000)
       const description = `Заказ кофе на имя ${formData.name}`
 
       const response = await fetch('/api/robokassa/init-payment', {

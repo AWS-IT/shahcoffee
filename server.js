@@ -85,8 +85,10 @@ const pendingOrders = new Map();
 
 // Генерация подписи MD5
 function generateSignature(merchantId, sum, orderId, pass) {
-  // Robokassa требует формат суммы с двумя знаками после точки: "2100.00"
-  const sumStr = parseFloat(sum).toFixed(2);
+  // Robokassa: сумма должна быть числом (без trailing zeros если целое)
+  // Пробуем целое число
+  const sumNum = Math.round(parseFloat(sum));
+  const sumStr = String(sumNum);
   const signatureString = `${merchantId}:${sumStr}:${orderId}:${pass}`;
   console.log('Signature generation string:', signatureString);
   const hash = crypto.createHash('md5').update(signatureString).digest('hex');
@@ -123,13 +125,11 @@ app.post('/api/robokassa/init-payment', (req, res) => {
   console.log('Sum (normalized):', sum);
   console.log('Signature:', signature);
 
-  // Отправляем сумму в формате "XXXX.XX" как требует Robokassa
-  const sumFormatted = parseFloat(sum).toFixed(2);
-
+  // Отправляем сумму как целое число
   res.json({
     merchantId: ROBOKASSA_MERCHANT_ID,
     orderId,
-    sum: sumFormatted,
+    sum: sum,
     description,
     signature,
     customerEmail: customerEmail || '',
