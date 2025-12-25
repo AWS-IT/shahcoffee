@@ -84,7 +84,7 @@ if (!ROBOKASSA_MERCHANT_ID || !ROBOKASSA_PASS1 || !ROBOKASSA_PASS2) {
 // Временное хранилище заказов (в production лучше использовать Redis или БД)
 const pendingOrders = new Map();
 
-// Генерация подписи MD5
+// Генерация подписи MD5 для инициализации платежа
 function generateSignature(merchantId, sum, orderId, pass) {
   // Robokassa: сумма как строка, формат X или X.XX
   const sumStr = String(sum);
@@ -92,6 +92,17 @@ function generateSignature(merchantId, sum, orderId, pass) {
   console.log('Signature generation string:', signatureString);
   const hash = crypto.createHash('md5').update(signatureString).digest('hex');
   console.log('Generated hash:', hash);
+  return hash;
+}
+
+// Генерация подписи MD5 для проверки Result callback (формула ДРУГАЯ!)
+function generateResultSignature(sum, orderId, pass) {
+  // Формула: MD5(OutSum:InvId:Password2) - БЕЗ MerchantLogin!
+  const sumStr = String(sum);
+  const signatureString = `${sumStr}:${orderId}:${pass}`;
+  console.log('Result signature string:', signatureString);
+  const hash = crypto.createHash('md5').update(signatureString).digest('hex');
+  console.log('Generated result hash:', hash);
   return hash;
 }
 
@@ -161,16 +172,9 @@ function handleRobokassaResult(req, res) {
   console.log('Sum (OutSum):', Sum);
   console.log('SignatureValue:', SignatureValue);
 
-  // Robokassa присылает сумму в формате "1.000000", нужно использовать как есть
-  // Убираем trailing zeros для подписи
-  let sumForSignature = parseFloat(Sum);
-  sumForSignature = Number.isInteger(sumForSignature) 
-    ? String(sumForSignature) 
-    : sumForSignature.toFixed(2);
-  
-  const expectedSignature = generateSignature(ROBOKASSA_MERCHANT_ID, sumForSignature, OrderId, ROBOKASSA_PASS2);
+  // Robokassa присылает сумму как "1.150000" - используем КАК ЕСТЬ для подписи
+  const expectedSignature = generateResultSignature(Sum, OrderId, ROBOKASSA_PASS2);
 
-  console.log('Sum for signature:', sumForSignature);
   console.log('Expected Signature:', expectedSignature);
   console.log('Received Signature:', SignatureValue);
   console.log('Match:', expectedSignature.toLowerCase() === SignatureValue.toLowerCase());
