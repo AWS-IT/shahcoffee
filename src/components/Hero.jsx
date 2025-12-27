@@ -23,10 +23,10 @@ function Hero() {
             <h1 className="hero__title">
               Брендированные стаканчики, которые продают ваш кофе ещё до первого глотка
             </h1>
-            <p className="hero__subtitle">
+            {/*<p className="hero__subtitle">
               Создаём уникальные стаканчики с вашим логотипом и дизайном. Помогаем кофейням,
               пекарням и точкам to-go выделиться среди конкурентов и запомниться клиентам.
-            </p>
+            </p>*/}
             <div className="hero__buttons">
               <button onClick={scrollToContacts} className="btn btn--primary">
                 Оставить заявку
@@ -39,7 +39,7 @@ function Hero() {
           <div className="hero__visual">
             <div className="hero__cup-mockup">
               <div className="hero__cup-label">
-                <img src="src/assets/main_photos/photomain.jpg" alt="photo" />
+                <img src="src/public/main_photos/photomain.jpg" alt="photo" />
               </div>
             </div>
           </div>

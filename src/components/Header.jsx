@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useCart } from '../context/CartContext.jsx'
 
+
 export default function Header({ isHome }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const { totalItems } = useCart()
@@ -19,7 +20,7 @@ export default function Header({ isHome }) {
     { label: 'О нас', to: '/about', scroll: 'about' },
     { label: 'Конструктор', to: '/constructor', scroll: 'constructor' },
     { label: 'Каталог', to: '/catalog', scroll: 'catalog' },
-    { label: 'Контакты', to: '/contacts', scroll: 'contacts' },
+    { label: 'Контакты', to: '/footer', scroll: 'footer' },
   ]
 
   return (

@@ -21,8 +21,11 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.7.0",
+    "http-proxy-middleware": "^3.0.5",
     "nodemon": "^3.1.11",
     "sass": "^1.77.8",
     "vite": "^7.2.7"
   }
 }
+
+

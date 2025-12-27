@@ -7,7 +7,7 @@ const MapSection = () => {
       <div className="container">
         {/* Красивый заголовок */}
         <div className="section-title">
-          <h2>Наши точки по всей России</h2>
+          <h2></h2>
         </div>
 
         {/* Сама карта */}

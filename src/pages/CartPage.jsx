@@ -268,7 +268,7 @@ export default function CartPage() {
   return (
     <section className="cart-page">
       <div className="container">
-        <h1>Корзина</h1>
+        {/*<h1>Корзина</h1>*/}
 
         <div className="cart-items">
           {cart.map(item => (

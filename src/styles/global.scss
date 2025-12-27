@@ -293,8 +293,8 @@ textarea {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 5px;
-  width: 44px;
+  gap: 2px;
+  width: 25px;
   height: 44px;
   background: transparent;
   border: none;
@@ -302,7 +302,7 @@ textarea {
   z-index: 1001;
 
   span {
-    width: 24px;
+    width: 30px;
     height: 2px;
     background: #333;
     border-radius: 2px;
@@ -369,6 +369,7 @@ textarea {
   flex-direction: column;
   gap: 8px;
   flex: 1;
+  align-items: start;
 }
 
 .header__mobile-link {
@@ -415,83 +416,200 @@ body.menu-open {
 
 
 // Hero
+// hero.scss — обновлённая версия
+
 .hero {
-  padding: var(--spacing-2xl) 0;
+  padding: 60px 0 80px;
+  margin-top: 30px;
+  overflow: hidden;
 
-  &__inner {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xl);
+  @media (min-width: 768px) {
+    padding: 100px 0 120px;
   }
 
-  &__content {
-    flex: 1;
-  }
-
-  &__title {
-    font-size: var(--font-size-3xl);
-    line-height: var(--line-height-tight);
-    margin-bottom: var(--spacing-md);
-  }
-
-  &__subtitle {
-    font-size: var(--font-size-lg);
-    color: var(--color-text-muted);
-    margin-bottom: var(--spacing-lg);
-    line-height: 1.6;
-  }
-
-  &__buttons {
-    display: flex;
-    gap: var(--spacing-sm);
-  }
-
-  &__visual {
-    flex: 0 0 400px;
-  }
-
-  &__cup-mockup {
-    border-radius: var(--radius-lg);
-    padding: var(--spacing-xl);
-    height: 400px;
-    width: 400px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: var(--shadow-soft);
-    position: relative;
-    overflow: hidden;
-
-    &::before {
-      content: '';
-      position: absolute;
-      top: -50%;
-      left: -50%;
-      width: 200%;
-      height: 200%;
-      background: radial-gradient(
-        circle,
-        rgba(255, 179, 71, 0.1) 0%,
-        transparent 70%
-      );
-    }
-  }
-
-  &__cup-label {
-    font-size: var(--font-size-xl);
-    font-weight: 600;
-    color: var(--color-accent-soft);
-    position: relative;
-    z-index: 1;
-    img{
-      height: 400px;
-      width: 400px;
-      background-repeat: no-repeat;
-      background-size: cover;
-    }
+  @media (min-width: 1200px) {
+    padding: 140px 0;
   }
 }
 
+.hero__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+
+  @media (min-width: 768px) {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+  }
+
+  @media (min-width: 1200px) {
+    gap: 80px;
+  }
+}
+
+.hero__content {
+  flex: 1;
+  text-align: center;
+  order: 2; // текст ниже на мобильном
+
+  @media (min-width: 768px) {
+    flex: 1 1 50%;
+    text-align: left;
+    order: 1;
+  }
+}
+
+.hero__title {
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #222;
+  margin-bottom: 20px;
+
+  @media (min-width: 480px) {
+    font-size: 28px;
+  }
+
+  @media (min-width: 768px) {
+    font-size: 44px;
+    margin-bottom: 24px;
+  }
+
+  @media (min-width: 1024px) {
+    font-size: 52px;
+  }
+}
+
+.hero__subtitle {
+  font-size: 17px;
+  line-height: 1.65;
+  color: #555;
+  margin-bottom: 32px;
+  max-width: 600px;
+  margin-left: auto;
+  margin-right: auto;
+
+  @media (min-width: 768px) {
+    font-size: 18px;
+    margin-left: 0;
+    margin-right: unset;
+    margin-bottom: 40px;
+  }
+}
+
+.hero__buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+
+  @media (min-width: 480px) {
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  @media (min-width: 768px) {
+    justify-content: flex-start;
+  }
+}
+
+.btn {
+  padding: 16px 32px;
+  border-radius: 12px;
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 220px;
+
+  @media (min-width: 480px) {
+    min-width: auto;
+  }
+}
+
+.btn--primary {
+  background: #008B9D;
+  color: white;
+  border: none;
+  box-shadow: 0 8px 25px rgba(0, 139, 157, 0.3);
+
+  &:hover {
+    background: #007a8b;
+    transform: translateY(-3px);
+    box-shadow: 0 12px 35px rgba(0, 139, 157, 0.4);
+  }
+}
+
+.btn--ghost {
+  background: transparent;
+  color: #008B9D;
+  border: 2px solid #008B9D;
+
+  &:hover {
+    background: #008B9D;
+    color: white;
+    transform: translateY(-3px);
+  }
+}
+
+.hero__visual {
+  flex: 1 1 100%;
+  order: 1; // изображение сверху на мобильном
+  max-width: 420px;
+  margin: 0 auto;
+
+  @media (min-width: 768px) {
+    flex: 0 0 480px;
+    order: 2;
+    max-width: none;
+  }
+
+  @media (min-width: 1024px) {
+    flex: 0 0 540px;
+  }
+}
+
+.hero__cup-mockup {
+  position: relative;
+  width: 100%;
+  height: 0;
+  padding-bottom: 100%; // идеальный квадрат
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.12);
+  background: linear-gradient(135deg, #f8fdfc 0%, #f0f8fa 100%);
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(0, 139, 157, 0.08) 0%, transparent 70%);
+    z-index: 1;
+    pointer-events: none;
+  }
+}
+
+.hero__cup-label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; // или contain — как тебе нравится
+    border-radius: 24px;
+  }
+}
 
 
 
@@ -898,10 +1016,10 @@ body.menu-open {
 
 
 // Catalog
-// catalog-preview.scss (или добавь в глобальный styles.scss)
+// catalog-preview.scss — обновлённая версия для супер-компактности на мобильных
 
 .catalog {
-  padding: 40px 0;
+  padding: 32px 0;
   background: #f6f1e9;
 
   @media (min-width: 768px) {
@@ -914,10 +1032,10 @@ body.menu-open {
 }
 
 .catalog__title {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 700;
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: 28px;
   color: #222;
 
   @media (min-width: 768px) {
@@ -926,13 +1044,14 @@ body.menu-open {
   }
 }
 
+// Основная идея: на мобильных — горизонтальные карточки, на больших экранах — вертикальные в сетке
 .catalog__grid {
   display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  grid-template-columns: 1fr; // одна колонка на мобильном
 
   @media (min-width: 480px) {
-    gap: 20px;
+    gap: 14px;
   }
 
   @media (min-width: 768px) {
@@ -946,7 +1065,7 @@ body.menu-open {
   }
 
   @media (min-width: 1400px) {
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 32px;
   }
 }
@@ -955,72 +1074,109 @@ body.menu-open {
   display: block;
   color: inherit;
   text-decoration: none;
-  transition: transform 0.2s ease;
+  transition: transform 0.25s ease;
 
   &:hover {
-    transform: translateY(-4px);
+    transform: translateY(-3px);
   }
 }
 
 .product-card {
   background: #fff;
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
   transition: box-shadow 0.3s ease;
-  display: flex;
-  flex-direction: column;
-  height: 100%; // важно для одинаковой высоты
+  height: 100%;
 
   &:hover {
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.16);
+  }
+
+  // === МОБИЛЬНЫЙ ВАРИАНТ: горизонтальная карточка ===
+  @media (max-width: 767px) {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    height: auto;
+    min-height: 120px;
+  }
+
+  // === ДЕСКТОП: вертикальная как раньше ===
+  @media (min-width: 768px) {
+    display: flex;
+    flex-direction: column;
   }
 }
 
 .product-card__image {
-  aspect-ratio: 1 / 1;
-  overflow: hidden;
-  background: #f5f5f5;
+  flex-shrink: 0;
+  background: #f8f8f8;
+
+  // Мобильный: квадратное фото слева
+  @media (max-width: 767px) {
+    width: 100px;
+    height: 100px;
+    aspect-ratio: unset;
+  }
+
+  // Десктоп: квадрат сверху
+  @media (min-width: 768px) {
+    aspect-ratio: 1 / 1;
+    width: 100%;
+  }
 
   img {
     width: 100%;
     height: 100%;
-    object-fit: contain; // или cover, если хочешь заполнять полностью
+    object-fit: contain;
     transition: transform 0.4s ease;
 
     .product-card-link:hover & {
-      transform: scale(1.05);
+      transform: scale(1.08);
     }
   }
 }
 
 .product-card__info {
-  padding: 12px;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   flex-grow: 1;
-  justify-content: space-between;
 
+  // Мобильный: меньше отступов
+  @media (max-width: 767px) {
+    padding: 12px 14px;
+    min-height: 100px;
+  }
+
+  // Десктоп: как было
   @media (min-width: 768px) {
     padding: 16px;
+    justify-content: space-between;
   }
 }
 
 .product-card__name {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.3;
   color: #222;
-  margin: 0 0 8px;
+  margin-bottom: 6px;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
 
+  @media (max-width: 767px) {
+    font-size: 14.5px;
+    margin-bottom: 4px;
+  }
+
   @media (min-width: 768px) {
     font-size: 15px;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 3;
   }
 
   @media (min-width: 1024px) {
@@ -1031,14 +1187,18 @@ body.menu-open {
 .product-card__price {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   margin-top: auto;
 }
 
 .product-card__price-main {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   color: #e31937;
+
+  @media (max-width: 767px) {
+    font-size: 17px;
+  }
 
   @media (min-width: 768px) {
     font-size: 18px;
@@ -1046,9 +1206,13 @@ body.menu-open {
 }
 
 .product-card__price-unit {
-  font-size: 11px;
+  font-size: 12px;
   color: #666;
   font-weight: 500;
+
+  @media (max-width: 767px) {
+    font-size: 12.5px;
+  }
 
   @media (min-width: 768px) {
     font-size: 13px;
@@ -1062,8 +1226,6 @@ body.menu-open {
   font-size: 18px;
   color: #666;
 }
-
-
 
 
 
@@ -1187,7 +1349,58 @@ body.menu-open {
 
 
 
+.delivery-section {
+  background: #fff; // белый фон, как просил
+  padding: 40px 0;
+  text-align: center;
 
+  @media (min-width: 768px) {
+    padding: 60px 0;
+  }
+
+  &__title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #222; // тёмный для заголовка, чтобы выделялся
+    margin-bottom: 20px;
+
+    @media (min-width: 768px) {
+      font-size: 32px;
+      margin-bottom: 28px;
+    }
+  }
+
+  &__text {
+    font-size: 16px;
+    line-height: 1.6;
+    color: #555; // модный серый для текста
+    max-width: 800px; // не слишком широкий, чтобы читался комфортно
+    margin: 0 auto;
+    padding: 0 20px;
+
+    @media (min-width: 768px) {
+      font-size: 17px;
+      padding: 0 40px;
+    }
+  }
+
+  &__divider {
+    width: 100px;
+    height: 2px;
+    background: #e31937; // твой фирменный красный для акцента
+    margin: 32px auto 0;
+    opacity: 0.8;
+    transition: width 0.3s ease;
+
+    &:hover {
+      width: 150px; // лёгкий эффект для интерактива
+    }
+
+    @media (min-width: 768px) {
+      margin-top: 40px;
+    }
+  }
+}
 
 
 
@@ -1447,26 +1660,25 @@ body.menu-open {
 /* ============================= */
 /* АДАПТИВНАЯ СТРАНИЦА ТОВАРА   */
 /* ============================= */
-
-// Страница товара
-// product-page.scss (вставляй в глобальный SCSS)
+// product-page.scss — финальная мобильная адаптация
 
 .product-page {
-  padding: 24px 0 40px;
+  padding: 32px 0 48px; /* больше воздуха сверху/снизу на мобильном */
 
   @media (min-width: 768px) {
-    padding: 40px 0 60px;
+    padding: 48px 0 64px;
   }
 
   @media (min-width: 1200px) {
-    padding: 60px 0 80px;
+    padding: 64px 0 80px;
   }
 }
 
 .breadcrumbs {
-  margin-bottom: 16px;
-  font-size: 13px;
+  margin-bottom: 20px;
+  font-size: 14px;
   color: #666;
+  text-align: center; /* по центру на мобильном */
 
   a {
     color: #666;
@@ -1474,127 +1686,149 @@ body.menu-open {
     transition: color 0.2s;
 
     &:hover {
-      color: #e31937;
+      color: #3bc9c1;
     }
   }
 
   span {
     color: #222;
-    font-weight: 500;
+    font-weight: 600;
   }
 
   @media (min-width: 768px) {
-    margin-bottom: 24px;
-    font-size: 14px;
+    margin-bottom: 28px;
+    font-size: 15px;
+    text-align: left;
   }
 }
 
 .product-page__content {
-  display: grid;
-  gap: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px; /* больше пространства между фото и инфой */
 
   @media (min-width: 992px) {
+    display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 40px;
+    gap: 48px;
     align-items: start;
   }
 
   @media (min-width: 1200px) {
-    gap: 60px;
+    gap: 64px;
   }
 }
 
 .product-page__gallery {
-  position: relative;
-  border-radius: 12px;
+  width: 100%;
+  max-width: 420px;
+  margin: 0 auto; /* центрируем фото */
+  border-radius: 20px;
   overflow: hidden;
   background: #f9f9f9;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.1);
+  aspect-ratio: 1 / 1; /* строго квадратное фото на мобильном */
+
+  @media (min-width: 992px) {
+    max-width: none;
+    aspect-ratio: unset;
+  }
 }
 
 .product-page__main-image {
   width: 100%;
-  height: auto;
-  max-height: 80vh;
-  object-fit: contain;
+  height: 100%;
+  object-fit: contain; /* товар красиво по центру */
   display: block;
+  background: #f9f9f9;
 }
 
 .product-page__info {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
+  text-align: center; /* по центру на мобильном */
+
+  @media (min-width: 992px) {
+    text-align: left;
+    gap: 28px;
+  }
 }
 
 .product-page__title {
-  font-size: 20px;
-  font-weight: 700;
-  line-height: 1.3;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.25;
   color: #222;
   margin: 0;
 
   @media (min-width: 768px) {
-    font-size: 26px;
+    font-size: 30px;
   }
 
   @media (min-width: 1200px) {
-    font-size: 32px;
+    font-size: 36px;
   }
 }
 
 .product-page__code {
-  font-size: 14px;
+  font-size: 15px;
   color: #555;
-  margin: 0;
 
   strong {
     color: #222;
+    font-weight: 600;
   }
 
   @media (min-width: 768px) {
-    font-size: 15px;
+    font-size: 16px;
   }
 }
 
 .product-page__buybox {
   background: #f8f8f8;
-  border-radius: 12px;
-  padding: 16px;
+  border-radius: 18px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 20px;
   border: 1px solid #eee;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
 
   @media (min-width: 768px) {
-    padding: 20px;
-    gap: 20px;
+    padding: 24px;
   }
 }
 
 .product-page__price {
   display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 8px;
-  font-weight: 700;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+
+  @media (min-width: 992px) {
+    flex-direction: row;
+    align-items: baseline;
+  }
 }
 
 .price-current {
-  font-size: 28px;
+  font-size: 32px;
+  font-weight: 800;
   color: #e31937;
 
   @media (min-width: 768px) {
-    font-size: 36px;
+    font-size: 38px;
   }
 }
 
 .price-unit {
-  font-size: 14px;
+  font-size: 16px;
   color: #666;
   font-weight: 500;
 
   @media (min-width: 768px) {
-    font-size: 16px;
+    font-size: 17px;
   }
 }
 
@@ -1602,61 +1836,64 @@ body.menu-open {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  gap: 20px;
   background: white;
-  border: 1px solid #ddd;
-  border-radius: 8px;
+  border: 2px solid #eee;
+  border-radius: 14px;
+  padding: 8px 16px;
   width: fit-content;
   margin: 0 auto;
-  padding: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 
   .qty-btn {
-    width: 36px;
-    height: 36px;
+    width: 42px;
+    height: 42px;
     border: none;
     background: transparent;
-    font-size: 20px;
+    font-size: 24px;
     font-weight: bold;
     color: #333;
     cursor: pointer;
-    border-radius: 6px;
+    border-radius: 10px;
     transition: all 0.2s;
 
     &:hover {
-      background: #e31937;
+      background: #3bc9c1;
       color: white;
     }
 
     &:active {
-      transform: scale(0.95);
+      transform: scale(0.92);
     }
   }
 
   .qty-value {
-    min-width: 40px;
+    min-width: 50px;
     text-align: center;
-    font-size: 18px;
-    font-weight: 600;
+    font-size: 20px;
+    font-weight: 700;
+    color: #222;
   }
 }
 
 .total-price-block {
   text-align: center;
-  font-size: 16px;
-  padding-top: 8px;
-  border-top: 1px dashed #ddd;
-  margin-top: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  padding-top: 12px;
+  border-top: 2px dashed #ddd;
 
   strong {
-    font-size: 22px;
+    font-size: 26px;
     color: #e31937;
+    font-weight: 800;
   }
 
   @media (min-width: 768px) {
-    font-size: 18px;
+    font-size: 19px;
 
     strong {
-      font-size: 26px;
+      font-size: 28px;
     }
   }
 }
@@ -1664,8 +1901,7 @@ body.menu-open {
 .product-page__actions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 8px;
+  gap: 14px;
 
   @media (min-width: 480px) {
     flex-direction: row;
@@ -1674,14 +1910,12 @@ body.menu-open {
 
 .btn-primary,
 .btn-whatsapp {
-  padding: 14px 20px;
-  border-radius: 10px;
-  font-size: 16px;
-  font-weight: 600;
+  padding: 16px 24px;
+  border-radius: 14px;
+  font-size: 17px;
+  font-weight: 700;
   text-align: center;
-  text-decoration: none;
-  transition: all 0.3s;
-  cursor: pointer;
+  transition: all 0.3s ease;
   border: none;
 
   &.btn-full {
@@ -1695,13 +1929,14 @@ body.menu-open {
 }
 
 .btn-primary {
-  background: #e31937;
+  background: #3bc9c1;
   color: white;
+  box-shadow: 0 8px 25px rgba(59, 201, 193, 0.3);
 
   &:hover {
-    background: #c8102e;
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(227, 25, 55, 0.3);
+    background: #34b8b0;
+    transform: translateY(-4px);
+    box-shadow: 0 14px 35px rgba(59, 201, 193, 0.4);
   }
 }
 
@@ -1711,66 +1946,51 @@ body.menu-open {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 10px;
 
   &::before {
     content: "WhatsApp";
-    font-weight: 600;
+    font-weight: 700;
   }
 
   &:hover {
     background: #1da851;
-    transform: translateY(-2px);
+    transform: translateY(-4px);
   }
 }
 
 .product-page__description {
-  margin-top: 24px;
-  line-height: 1.6;
+  margin-top: 32px;
+  line-height: 1.7;
   color: #444;
-  font-size: 15px;
+  font-size: 16px;
+  text-align: center;
+
+  @media (min-width: 992px) {
+    text-align: left;
+    margin-top: 40px;
+    font-size: 16.5px;
+  }
 
   h3 {
-    font-size: 18px;
-    margin: 0 0 12px;
+    font-size: 20px;
+    margin: 0 0 16px;
     color: #222;
-    font-weight: 600;
-  }
+    font-weight: 700;
 
-  @media (min-width: 768px) {
-    font-size: 16px;
-
-    h3 {
-      font-size: 20px;
+    @media (min-width: 768px) {
+      font-size: 22px;
     }
-  }
-}
-
-.btn-add-to-cart {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font-size: 17px;
-  padding: 16px 20px !important;
-
-  svg {
-    flex-shrink: 0;
-  }
-
-  @media (min-width: 768px) {
-    font-size: 18px;
   }
 }
 
 // Лоадер
 .loading {
   text-align: center;
-  padding: 80px 20px;
+  padding: 100px 20px;
   font-size: 18px;
   color: #666;
 }
-
 
 
 
@@ -1788,6 +2008,7 @@ body.menu-open {
 
 .cart-page {
   padding: 32px 0 60px;
+  margin-top: 60px;
 
   @media (min-width: 768px) {
     padding: 48px 0 80px;
