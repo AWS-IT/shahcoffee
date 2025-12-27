@@ -39,7 +39,7 @@ function Hero() {
           <div className="hero__visual">
             <div className="hero__cup-mockup">
               <div className="hero__cup-label">
-                <img src="src/public/main_photos/photomain.jpg" alt="photo" />
+                <img src="/main_photos/photomain.jpg" alt="photo" />
               </div>
             </div>
           </div>
