@@ -7,8 +7,8 @@ export default function CatalogPreview() {
 
   useEffect(() => {
     fetch('/api_ms/entity/product?expand=images&limit=100', {
-  method: 'GET'
-})
+      method: 'GET'
+    })
       .then(r => r.json())
       .then(data => {
         console.log('📦 Товары загружены:', data.rows?.length);
@@ -55,12 +55,14 @@ export default function CatalogPreview() {
 
   if (loading) return <div className="catalog-loading">Загрузка...</div>
 
-  return (
+  const previewProducts = products.slice(0, 8) /* здесь products на previewProducts поменял чтоб поставить ограничение*/
+
+return (
     <div className="catalog" id="catalog">
       <div className="container">
-        <h2 className="catalog__title">Каталог продукции</h2>
+        <h2 className="catalog__title">Наша продукция</h2>
         <div className="catalog__grid">
-          {products.map(product => {
+          {previewProducts.map(product => {       
             const price = getPrice(product)
             return (
               <Link to={`/product/${product.id}`} key={product.id} className="product-card-link">
@@ -80,6 +82,14 @@ export default function CatalogPreview() {
             )
           })}
         </div>
+        {/* Кнопка на полную страницу, если товаров больше 8 */}
+        {products.length >= 8 && (
+          <div className="catalog__toggle">
+            <Link to="/catalog" className="catalog__toggle-btn">
+              Посмотреть еще
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   )

@@ -2,7 +2,7 @@ import React from 'react';
 
 export default function DeliverySection() {
   return (
-    <section className="delivery-section">
+    <section id="dvs" className="delivery-section">
       <div className="container">
         <h2 className="delivery-section__title">Доставка по всей России</h2>
         <p className="delivery-section__text">

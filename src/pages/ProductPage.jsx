@@ -62,25 +62,24 @@ export default function ProductPage() {
           <Link to="/">Главная</Link> → <Link to="/catalog">Каталог</Link> → <span>{product.name}</span>
         </div>
 
-        <div className="product-page__content">
-          <div className="product-page__gallery">
-            <img src={imageUrl} alt={product.name} className="product-page__main-image" loading="lazy" />
-          </div>
-
-          <div className="product-page__info">
-            <h1 className="product-page__title">{product.name}</h1>
-
-            {product.code && (
-              <p className="product-page__code">
-                <strong>Артикул:</strong> {product.code}
-              </p>
-            )}
+        <div className="product-page__grid">
+          {/* Левая колонка: фото + покупка */}
+          <div className="product-page__main">
+            <div className="product-page__gallery">
+              <img src={imageUrl} alt={product.name} className="product-page__main-image" loading="lazy" />
+            </div>
 
             <div className="product-page__buybox">
               <div className="product-page__price">
                 <span className="price-current">{priceRub.toLocaleString('ru-RU')} ₽</span>
                 <span className="price-unit">/ упаковка</span>
               </div>
+
+              {product.code && (
+                <p className="product-page__code">
+                  <strong>Артикул:</strong> {product.code}
+                </p>
+              )}
 
               <div className="quantity-block">
                 <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="qty-btn">−</button>
@@ -91,29 +90,30 @@ export default function ProductPage() {
               <div className="total-price-block">
                 Итого: <strong>{totalPrice.toLocaleString('ru-RU')} ₽</strong>
               </div>
-            </div>
 
-            <div className="product-page__actions">
-              <button onClick={handleAddToCart} className="btn-primary btn-full">
-                В корзину
-              </button>
-              <a
-                href={`https://wa.me/79991234567?text=${waText}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-whatsapp btn-full"
-              >
-                Заказать в WhatsApp
-              </a>
-            </div>
-
-            {product.description && (
-              <div className="product-page__description">
-                <h3>Описание</h3>
-                <div dangerouslySetInnerHTML={{ __html: product.description.replace(/\n/g, '<br>') }} />
+              <div className="product-page__actions">
+                <button onClick={handleAddToCart} className="btn-primary">
+                  В корзину
+                </button>
+                <a
+                  href={`https://wa.me/79991234567?text=${waText}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn-whatsapp"
+                >
+                  Заказать в WhatsApp
+                </a>
               </div>
-            )}
+            </div>
           </div>
+
+          {/* Правая колонка: только описание */}
+          {product.description && (
+            <div className="product-page__description-section">
+              <h3 className="description-title">Описание товара</h3>
+              <div className="description-text" dangerouslySetInnerHTML={{ __html: product.description.replace(/\n/g, '<br>') }} />
+            </div>
+          )}
         </div>
       </div>
     </section>

@@ -36,7 +36,7 @@ function Footer() {
   ];
 
   return (
-    <footer className="footer">
+    <footer id="footer" className="footer">
       <div className="container">
         <div className="footer__inner">
 
@@ -51,8 +51,8 @@ function Footer() {
             <button onClick={() => scrollToSection('about')} className="footer__nav-link">
               О нас
             </button>
-            <button onClick={() => scrollToSection('constructor')} className="footer__nav-link">
-              Конструктор
+            <button onClick={() => scrollToSection('dvs')} className="footer__nav-link">
+              Карта продаж
             </button>
             <button onClick={() => scrollToSection('catalog')} className="footer__nav-link">
               Каталог

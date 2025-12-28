@@ -2,7 +2,7 @@ import React from 'react';
 
 function Hero() {
   const scrollToContacts = () => {
-    const element = document.getElementById('contacts');
+    const element = document.getElementById('footer');
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' });
     }

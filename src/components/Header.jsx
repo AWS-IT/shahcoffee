@@ -18,7 +18,7 @@ export default function Header({ isHome }) {
 
   const menuItems = [
     { label: 'О нас', to: '/about', scroll: 'about' },
-    { label: 'Конструктор', to: '/constructor', scroll: 'constructor' },
+    { label: 'Карта продаж', to: '/dvs', scroll: 'dvs' },
     { label: 'Каталог', to: '/catalog', scroll: 'catalog' },
     { label: 'Контакты', to: '/footer', scroll: 'footer' },
   ]
