@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function PaymentResultPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { clearCart } = useCart();
+  const { isAuthenticated } = useAuth();
   const [status, setStatus] = useState('processing'); // processing, success, error
   const [orderData, setOrderData] = useState(null);
   const [message, setMessage] = useState('Обработка платежа...');
@@ -20,24 +22,44 @@ export default function PaymentResultPage() {
 
     // Получаем сохраненные данные заказа из localStorage
     const pendingOrder = localStorage.getItem('pendingOrder');
+    let order = null;
     if (pendingOrder) {
-      setOrderData(JSON.parse(pendingOrder));
+      order = JSON.parse(pendingOrder);
+      setOrderData(order);
     }
 
     // Если есть InvId и SignatureValue - платёж успешен (Robokassa так перенаправляет только успешные)
     if (invId && signatureValue) {
       setStatus('success');
-      setMessage('Платеж успешно обработан! Спасибо за ваш заказ.');
+      setMessage('Платеж успешно обработан! Перенаправляем на страницу заказа...');
       
-      // Очищаем корзину и localStorage
+      // Очищаем корзину
       clearCart();
-      localStorage.removeItem('pendingOrder');
+      
+      // Обновляем статус заказа
+      if (order) {
+        order.status = 'paid';
+        localStorage.setItem('pendingOrder', JSON.stringify(order));
+        
+        // Сохраняем в историю заказов
+        const savedOrders = localStorage.getItem('userOrders');
+        const orders = savedOrders ? JSON.parse(savedOrders) : [];
+        if (!orders.find(o => o.orderId === order.orderId)) {
+          orders.push(order);
+          localStorage.setItem('userOrders', JSON.stringify(orders));
+        }
+      }
+      
+      // Перенаправляем на страницу заказа через 1.5 сек
+      setTimeout(() => {
+        navigate('/order');
+      }, 1500);
     } else {
       // Если нет параметров - возможно это ошибка или прямой заход
       setStatus('error');
       setMessage('Не получены данные платежа. Пожалуйста, свяжитесь с поддержкой.');
     }
-  }, [searchParams, clearCart]);
+  }, [searchParams, clearCart, navigate]);
 
   return (
     <section className="payment-result-page">

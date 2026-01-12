@@ -4,12 +4,14 @@ import CatalogPreview from '../components/CatalogPreview.jsx';
 import ConstructorPromo from '../components/ConstructorPromo.jsx';
 import MapSection from '../components/MapSection.jsx';
 import DeliverySection from '../components/DeliverySection.jsx'
+import HomeMap from '../components/HomeMap.jsx'
 
 export default function Home() {
   return (
     <>
       <Hero />
       <About id="about" />
+      <HomeMap />
       <section id="catalog"><CatalogPreview /></section>
       <DeliverySection/>
       {/*<ConstructorPromo id="constructor" />*/}

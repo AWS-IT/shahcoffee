@@ -281,3 +281,138 @@
     font-size: 24px;
   }
 }
+
+/* AddressSuggest Styles */
+.address-suggest {
+  position: relative;
+  width: 100%;
+}
+
+.address-input-wrapper {
+  position: relative;
+}
+
+.address-input {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e3fbfa;
+  border-radius: 12px;
+  font-size: 16px;
+  font-family: inherit;
+  transition: all 0.3s ease;
+  color: #2b2620;
+}
+
+.address-input:focus {
+  outline: none;
+  border-color: #32c7c2;
+  box-shadow: 0 0 0 3px rgba(50, 199, 194, 0.1);
+}
+
+.address-loading {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: translateY(-50%) rotate(0deg); }
+  to { transform: translateY(-50%) rotate(360deg); }
+}
+
+.address-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1000;
+  list-style: none;
+  padding: 8px 0;
+  margin: 4px 0 0 0;
+}
+
+.address-suggestion-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.address-suggestion-item:hover {
+  background: #f0fafa;
+}
+
+.suggestion-icon {
+  flex-shrink: 0;
+  font-size: 16px;
+}
+
+.suggestion-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.suggestion-name {
+  display: block;
+  font-weight: 500;
+  color: #2b2620;
+  font-size: 14px;
+}
+
+.suggestion-description {
+  display: block;
+  font-size: 12px;
+  color: #8a7b6a;
+  margin-top: 2px;
+}
+
+.address-confirmed {
+  color: #00a854;
+  font-size: 13px;
+  margin-top: 8px;
+  font-weight: 500;
+}
+
+/* Auth Required Block */
+.auth-required {
+  text-align: center;
+  padding: 60px 40px;
+  background: white;
+  border-radius: 24px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.auth-required h1 {
+  font-size: 28px;
+  margin-bottom: 16px;
+}
+
+.auth-required p {
+  font-size: 18px;
+  color: #5a5048;
+  margin-bottom: 12px;
+}
+
+.auth-required .auth-hint {
+  font-size: 14px;
+  color: #8a7b6a;
+  margin-bottom: 24px;
+}
+
+.auth-required .btn-primary {
+  display: inline-block;
+  padding: 14px 32px;
+  text-decoration: none;
+}

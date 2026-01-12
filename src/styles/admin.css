@@ -244,3 +244,211 @@
     font-size: 18px;
   }
 }
+
+/* ========== ТАБЫ ========== */
+.admin-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 14px 20px;
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.tab-btn.active {
+  background: white;
+  color: #667eea;
+}
+
+/* ========== МЕТКИ ========== */
+.markers-section {
+  max-width: 800px;
+}
+
+.markers-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.markers-header h2 {
+  margin: 0;
+  font-size: 22px;
+  color: #333;
+}
+
+.marker-form {
+  background: #f8f9fa;
+  border-radius: 12px;
+  padding: 25px;
+  margin-bottom: 25px;
+}
+
+.marker-form h3 {
+  margin: 0 0 20px 0;
+  color: #333;
+  font-size: 18px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.selected-address {
+  margin-top: 8px;
+  color: #4caf50;
+  font-size: 13px;
+}
+
+.markers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.marker-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background: #f8f9fa;
+  border-radius: 10px;
+  transition: all 0.2s;
+}
+
+.marker-item:hover {
+  background: #eef;
+}
+
+.marker-item.inactive {
+  opacity: 0.5;
+}
+
+.marker-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.marker-color {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.marker-color.color-red { color: #e53935; }
+.marker-color.color-blue { color: #1e88e5; }
+.marker-color.color-green { color: #43a047; }
+.marker-color.color-orange { color: #fb8c00; }
+.marker-color.color-violet { color: #8e24aa; }
+.marker-color.color-yellow { color: #fdd835; }
+
+.marker-info strong {
+  display: block;
+  color: #333;
+  font-size: 15px;
+}
+
+.marker-address {
+  margin: 4px 0 0 0;
+  color: #666;
+  font-size: 13px;
+}
+
+.marker-desc {
+  margin: 4px 0 0 0;
+  color: #888;
+  font-size: 12px;
+  font-style: italic;
+}
+
+.marker-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-edit, .btn-delete {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+.btn-edit {
+  background: #e3f2fd;
+}
+
+.btn-edit:hover {
+  background: #bbdefb;
+}
+
+.btn-delete {
+  background: #ffebee;
+}
+
+.btn-delete:hover {
+  background: #ffcdd2;
+}
+
+.btn-secondary {
+  padding: 12px 24px;
+  background: #e0e0e0;
+  color: #333;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background: #bdbdbd;
+}
+
+.no-markers {
+  text-align: center;
+  color: #888;
+  padding: 40px;
+}
+
+@media (max-width: 600px) {
+  .admin-container {
+    max-width: 100%;
+  }
+  
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .markers-header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: stretch;
+  }
+}

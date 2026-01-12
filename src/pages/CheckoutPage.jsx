@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
 import { useCart } from '../context/CartContext.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 import { Link, useNavigate } from 'react-router-dom';
+import AddressSuggest from '../components/AddressSuggest.jsx';
 
 export default function CheckoutPage() {
   const { cart, totalPrice, clearCart } = useCart();
+  const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
-    name: '',
+    name: user?.first_name || '',
     phone: '',
     email: '',
     address: '',
   });
+  const [coordinates, setCoordinates] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -26,6 +30,22 @@ export default function CheckoutPage() {
     );
   }
 
+  // Проверка авторизации через Telegram
+  if (!isAuthenticated) {
+    return (
+      <section className="checkout-page">
+        <div className="container">
+          <div className="auth-required">
+            <h1>🔐 Требуется авторизация</h1>
+            <p>Для оформления заказа необходимо войти через Telegram</p>
+            <p className="auth-hint">Нажмите на кнопку «Войти» в шапке сайта</p>
+            <Link to="/" className="btn-primary">На главную</Link>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
@@ -33,9 +53,31 @@ export default function CheckoutPage() {
     });
   };
 
+  const handleAddressChange = (address) => {
+    setFormData({
+      ...formData,
+      address,
+    });
+  };
+
+  const handleAddressSelect = (suggestion) => {
+    setFormData({
+      ...formData,
+      address: suggestion.address,
+    });
+    setCoordinates(suggestion.coordinates);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+
+    // Проверяем что адрес выбран из списка (есть координаты)
+    if (!coordinates) {
+      setError('Пожалуйста, выберите адрес из списка подсказок');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -65,8 +107,10 @@ export default function CheckoutPage() {
       localStorage.setItem('pendingOrder', JSON.stringify({
         orderId,
         customerData: formData,
-        cartItems: cart,
+        coordinates, // Сохраняем координаты для карты
+        items: cart,
         totalPrice,
+        createdAt: new Date().toISOString(),
       }));
 
       // Перенаправляем пользователя на Robokassa
@@ -131,16 +175,18 @@ export default function CheckoutPage() {
               </div>
 
               <div className="form-group">
-                <label htmlFor="address">Адрес доставки</label>
-                <textarea
-                  id="address"
-                  name="address"
-                  placeholder="Москва, ул. Пушкина, д. 10"
+                <label htmlFor="address">Адрес доставки *</label>
+                <AddressSuggest
                   value={formData.address}
-                  onChange={handleChange}
-                  rows="3"
-                  className="form-textarea"
+                  onChange={handleAddressChange}
+                  onSelect={handleAddressSelect}
+                  placeholder="Начните вводить адрес..."
                 />
+                {coordinates && (
+                  <p className="address-confirmed">
+                    ✓ Адрес подтверждён
+                  </p>
+                )}
               </div>
 
               {error && (

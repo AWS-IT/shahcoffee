@@ -1,152 +1,265 @@
 import React, { useState, useEffect } from 'react'
+import AddressSuggest from '../components/AddressSuggest'
 import '../styles/admin.css'
 
 export default function Admin() {
-  const [token, setToken] = useState('')
-  const [syncStatus, setSyncStatus] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [syncing, setSyncing] = useState(false)
-  const [message, setMessage] = useState('')
-  const [messageType, setMessageType] = useState('')
+  // Состояние для меток
+  const [markers, setMarkers] = useState([])
+  const [markersLoading, setMarkersLoading] = useState(false)
+  const [showMarkerForm, setShowMarkerForm] = useState(false)
+  const [editingMarker, setEditingMarker] = useState(null)
+  const [addressInput, setAddressInput] = useState('') // Для поля ввода адреса
+  const [markerForm, setMarkerForm] = useState({
+    title: '',
+    description: '',
+    address: '',
+    lat: '',
+    lon: '',
+    icon_color: 'red',
+    is_active: true
+  })
 
   useEffect(() => {
-    loadSyncStatus()
+    loadMarkers()
   }, [])
 
-  const loadSyncStatus = async () => {
+  const loadMarkers = async () => {
+    setMarkersLoading(true)
     try {
-      const response = await fetch('/admin/sync-status')
+      const response = await fetch('/api/admin/markers')
       const data = await response.json()
-      setSyncStatus(data)
+      if (Array.isArray(data)) {
+        setMarkers(data)
+      }
     } catch (error) {
-      console.error('Ошибка при загрузке статуса:', error)
+      console.error('Ошибка загрузки меток:', error)
+    } finally {
+      setMarkersLoading(false)
     }
   }
 
-  const handleSync = async (e) => {
-    e.preventDefault()
-    setSyncing(true)
-    setMessage('')
+  const handleAddressSelect = (suggestion) => {
+    setMarkerForm(prev => ({
+      ...prev,
+      address: suggestion.address,
+      lat: suggestion.coordinates.lat,
+      lon: suggestion.coordinates.lon
+    }))
+  }
 
-    if (!token) {
-      setMessageType('error')
-      setMessage('Введите API токен')
-      setSyncing(false)
+  const resetMarkerForm = () => {
+    setMarkerForm({
+      title: '',
+      description: '',
+      address: '',
+      lat: '',
+      lon: '',
+      icon_color: 'red',
+      is_active: true
+    })
+    setAddressInput('')
+    setEditingMarker(null)
+    setShowMarkerForm(false)
+  }
+
+  const handleMarkerSubmit = async (e) => {
+    e.preventDefault()
+    
+    if (!markerForm.title || !markerForm.lat || !markerForm.lon) {
+      alert('Заполните название и выберите адрес')
       return
     }
 
     try {
-      const response = await fetch('/admin/sync-products', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ token })
+      const url = editingMarker 
+        ? `/api/admin/markers/${editingMarker.id}`
+        : '/api/admin/markers'
+      
+      const response = await fetch(url, {
+        method: editingMarker ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(markerForm)
       })
 
-      const data = await response.json()
-
       if (response.ok) {
-        setMessageType('success')
-        setMessage(`✓ Синхронизация завершена! Загружено ${data.count} товаров`)
-        setToken('')
-        loadSyncStatus()
-        setTimeout(() => setMessage(''), 5000)
+        loadMarkers()
+        resetMarkerForm()
       } else {
-        setMessageType('error')
-        setMessage(data.error || 'Ошибка синхронизации')
+        alert('Ошибка сохранения метки')
       }
     } catch (error) {
-      setMessageType('error')
-      setMessage('Ошибка подключения к серверу')
       console.error('Ошибка:', error)
-    } finally {
-      setSyncing(false)
+      alert('Ошибка сохранения метки')
     }
   }
 
-  const formatDate = (isoString) => {
-    if (!isoString) return 'Никогда'
-    const date = new Date(isoString)
-    return date.toLocaleString('ru-RU')
+  const handleEditMarker = (marker) => {
+    setMarkerForm({
+      title: marker.title,
+      description: marker.description || '',
+      address: marker.address || '',
+      lat: marker.lat,
+      lon: marker.lon,
+      icon_color: marker.icon_color || 'red',
+      is_active: marker.is_active
+    })
+    setAddressInput(marker.address || '')
+    setEditingMarker(marker)
+    setShowMarkerForm(true)
+  }
+
+  const handleDeleteMarker = async (id) => {
+    if (!confirm('Удалить метку?')) return
+    
+    try {
+      await fetch(`/api/admin/markers/${id}`, { method: 'DELETE' })
+      loadMarkers()
+    } catch (error) {
+      console.error('Ошибка удаления:', error)
+    }
   }
 
   return (
     <div className="admin-page">
       <div className="admin-container">
-        <h1>Администратор - Управление товарами</h1>
+        <h1>Панель администратора</h1>
 
-        <div className="admin-card">
-          <div className="status-box">
-            <h3>Статус синхронизации</h3>
-            {syncStatus ? (
-              <div className={syncStatus.productsCount > 0 ? 'status-success' : 'status-warning'}>
-                <p><strong>Товаров в базе:</strong> {syncStatus.productsCount}</p>
-                <p><strong>Последняя синхронизация:</strong> {formatDate(syncStatus.lastSync)}</p>
-                {syncStatus.hasToken ? (
-                  <p>✓ API токен сохранён</p>
-                ) : (
-                  <p>⚠️ Токен не сохранён, введите ниже</p>
-                )}
-              </div>
-            ) : (
-              <div className="status-warning">
-                <p>Загрузка...</p>
-              </div>
-            )}
-          </div>
-
-          <form onSubmit={handleSync} className="admin-form">
-            <h2>Синхронизация товаров из МойСклад</h2>
-
-            <div className="form-group">
-              <label htmlFor="token">API Токен МойСклад</label>
-              <input
-                type="text"
-                id="token"
-                name="token"
-                value={token}
-                onChange={(e) => setToken(e.target.value)}
-                placeholder="Вставьте API токен"
-                disabled={syncing}
-                required
-              />
+        <div className="admin-card markers-section">
+          <div className="markers-header">
+            <h2>📍 Метки на карте</h2>
+              <button 
+                className="btn-primary"
+                onClick={() => setShowMarkerForm(!showMarkerForm)}
+              >
+                {showMarkerForm ? '✕ Закрыть' : '+ Добавить метку'}
+              </button>
             </div>
 
-            <p className="info-text">
-              ℹ️ Токен будет сохранён на сервере и использоваться для автоматической синхронизации.
-              Товары будут загружены в базу данных и отображаться на сайте без запросов к МойСклад.
-            </p>
+            {showMarkerForm && (
+              <form onSubmit={handleMarkerSubmit} className="marker-form">
+                <h3>{editingMarker ? 'Редактировать метку' : 'Новая метка'}</h3>
+                
+                <div className="form-group">
+                  <label>Название *</label>
+                  <input
+                    type="text"
+                    value={markerForm.title}
+                    onChange={(e) => setMarkerForm({...markerForm, title: e.target.value})}
+                    placeholder="Название точки"
+                    required
+                  />
+                </div>
 
-            {message && (
-              <div className={`message message-${messageType}`}>
-                {message}
-              </div>
+                <div className="form-group">
+                  <label>Описание (текст в балуне)</label>
+                  <textarea
+                    value={markerForm.description}
+                    onChange={(e) => setMarkerForm({...markerForm, description: e.target.value})}
+                    placeholder="Описание, которое появится при клике на метку"
+                    rows={3}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>Адрес (поиск) *</label>
+                  <AddressSuggest 
+                    value={addressInput}
+                    onChange={setAddressInput}
+                    onSelect={handleAddressSelect}
+                    placeholder="Начните вводить адрес..."
+                  />
+                  {markerForm.address && (
+                    <p className="selected-address">✓ Выбран: {markerForm.address}</p>
+                  )}
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Широта</label>
+                    <input
+                      type="text"
+                      value={markerForm.lat}
+                      onChange={(e) => setMarkerForm({...markerForm, lat: e.target.value})}
+                      placeholder="55.7558"
+                      readOnly
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label>Долгота</label>
+                    <input
+                      type="text"
+                      value={markerForm.lon}
+                      onChange={(e) => setMarkerForm({...markerForm, lon: e.target.value})}
+                      placeholder="37.6173"
+                      readOnly
+                    />
+                  </div>
+                </div>
+
+                <div className="form-row">
+                  <div className="form-group">
+                    <label>Цвет метки</label>
+                    <select
+                      value={markerForm.icon_color}
+                      onChange={(e) => setMarkerForm({...markerForm, icon_color: e.target.value})}
+                    >
+                      <option value="red">🔴 Красный</option>
+                      <option value="blue">🔵 Синий</option>
+                      <option value="green">🟢 Зелёный</option>
+                      <option value="orange">🟠 Оранжевый</option>
+                      <option value="violet">🟣 Фиолетовый</option>
+                      <option value="yellow">🟡 Жёлтый</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>Статус</label>
+                    <select
+                      value={markerForm.is_active ? 'true' : 'false'}
+                      onChange={(e) => setMarkerForm({...markerForm, is_active: e.target.value === 'true'})}
+                    >
+                      <option value="true">✅ Активна</option>
+                      <option value="false">❌ Скрыта</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="form-actions">
+                  <button type="submit" className="btn-primary">
+                    {editingMarker ? 'Сохранить' : 'Создать метку'}
+                  </button>
+                  <button type="button" className="btn-secondary" onClick={resetMarkerForm}>
+                    Отмена
+                  </button>
+                </div>
+              </form>
             )}
 
-            <button
-              type="submit"
-              className="btn-primary admin-btn"
-              disabled={syncing}
-            >
-              {syncing ? 'Синхронизация...' : 'Синхронизировать товары'}
-            </button>
-          </form>
-        </div>
-
-        <div className="info-section">
-          <h3>Как получить API токен?</h3>
-          <ol>
-            <li>Откройте <a href="https://online.moysklad.ru" target="_blank" rel="noreferrer">МойСклад</a></li>
-            <li>Перейдите в Настройки → Пользователи и права</li>
-            <li>Откройте вашего пользователя</li>
-            <li>Перейдите на вкладку "API"</li>
-            <li>Нажмите "Создать токен" (если токена нет)</li>
-            <li>Скопируйте токен и вставьте в форму выше</li>
-          </ol>
-          <p><strong>Важно:</strong> Токен сохраняется на сервере, вводить нужно только один раз (или при смене токена).</p>
+            <div className="markers-list">
+              {markersLoading ? (
+                <p>Загрузка...</p>
+              ) : markers.length === 0 ? (
+                <p className="no-markers">Меток пока нет. Добавьте первую!</p>
+              ) : (
+                markers.map(marker => (
+                  <div key={marker.id} className={`marker-item ${!marker.is_active ? 'inactive' : ''}`}>
+                    <div className="marker-info">
+                      <span className={`marker-color color-${marker.icon_color}`}>●</span>
+                      <div>
+                        <strong>{marker.title}</strong>
+                        {marker.address && <p className="marker-address">{marker.address}</p>}
+                        {marker.description && <p className="marker-desc">{marker.description}</p>}
+                      </div>
+                    </div>
+                    <div className="marker-actions">
+                      <button onClick={() => handleEditMarker(marker)} className="btn-edit">✏️</button>
+                      <button onClick={() => handleDeleteMarker(marker.id)} className="btn-delete">🗑️</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       </div>
-    </div>
   )
 }

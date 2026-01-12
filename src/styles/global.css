@@ -279,6 +279,74 @@ textarea {
   transform: scale(1.08);
 }
 
+.header__auth {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: 12px;
+  padding-left: 12px;
+  border-left: 1px solid #e0e0e0;
+}
+
+.header__profile-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: transparent;
+  color: #333;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 24px;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.header__profile-btn .profile-icon {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+}
+
+.header__profile-btn:hover {
+  background: #f8f8f8;
+  border-color: #ccc;
+  color: #000;
+}
+
+.header__logout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  background: transparent;
+  color: #888;
+  border: 1.5px solid #e0e0e0;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.header__logout-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.header__logout-btn:hover {
+  background: #fee;
+  border-color: #e57373;
+  color: #c62828;
+}
+
+.header__mobile-auth {
+  padding: 16px 20px;
+  border-top: 1px solid #e0e0e0;
+  margin-top: 16px;
+}
+
 .header__cart-icon {
   width: 24px;
   height: 24px;

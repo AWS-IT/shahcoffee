@@ -1,11 +1,15 @@
 import React, { useState } from 'react'
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
+import TelegramLoginButton from './TelegramLoginButton.jsx'
 
 
 export default function Header({ isHome }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const { totalItems } = useCart()
+  const { user, isAuthenticated, logout } = useAuth()
+  const navigate = useNavigate()
 
   const scrollToSection = (id) => {
     if (!isHome) return
@@ -66,6 +70,26 @@ export default function Header({ isHome }) {
                   <span className="header__cart-badge">{totalItems}</span>
                 )}
               </NavLink>
+
+              {/* Личный кабинет и авторизация */}
+              <div className="header__auth">
+                <NavLink to="/profile" className="header__profile-btn">
+                  <svg className="profile-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                  </svg>
+                  <span>{isAuthenticated ? (user?.first_name || 'Профиль') : 'Войти'}</span>
+                </NavLink>
+                {isAuthenticated && (
+                  <button onClick={logout} className="header__logout-btn" title="Выйти">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                      <polyline points="16 17 21 12 16 7"/>
+                      <line x1="21" y1="12" x2="9" y2="12"/>
+                    </svg>
+                  </button>
+                )}
+              </div>
             </nav>
 
             <button
@@ -120,6 +144,10 @@ export default function Header({ isHome }) {
             >
               Корзина {totalItems > 0 && `(${totalItems})`}
             </NavLink>
+
+            <div className="header__mobile-auth">
+              <TelegramLoginButton />
+            </div>
           </nav>
         </div>
       </div>

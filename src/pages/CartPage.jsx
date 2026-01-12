@@ -2,6 +2,7 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext.jsx'
+import AddressSuggest from '../components/AddressSuggest.jsx'
 
 export default function CartPage() {
   const { cart, updateQuantity, removeFromCart, clearCart, totalPrice } = useCart()
@@ -15,6 +16,16 @@ export default function CartPage() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [coordinates, setCoordinates] = useState(null)
+
+  const handleAddressChange = (address) => {
+    setFormData({ ...formData, address })
+  }
+
+  const handleAddressSelect = (suggestion) => {
+    setFormData({ ...formData, address: suggestion.address })
+    setCoordinates(suggestion.coordinates)
+  }
 
   const handleChange = (e) => {
     setFormData({
@@ -26,6 +37,13 @@ export default function CartPage() {
   const handleCheckout = async (e) => {
     e.preventDefault()
     setError(null)
+
+    // Проверяем что адрес выбран из списка
+    if (!coordinates) {
+      setError('Пожалуйста, выберите адрес из списка подсказок')
+      return
+    }
+
     setLoading(true)
 
     try {
@@ -66,7 +84,8 @@ export default function CartPage() {
       localStorage.setItem('pendingOrder', JSON.stringify({
         orderId,
         customerData: formData,
-        cartItems: cart,
+        coordinates,
+        items: cart,
         totalPrice,
       }))
 
@@ -201,16 +220,16 @@ export default function CartPage() {
                 </div>
 
                 <div className="form-group">
-                  <label htmlFor="address">Адрес доставки</label>
-                  <textarea
-                    id="address"
-                    name="address"
-                    placeholder="Москва, ул. Пушкина, д. 10"
+                  <label htmlFor="address">Адрес доставки *</label>
+                  <AddressSuggest
                     value={formData.address}
-                    onChange={handleChange}
-                    rows="3"
-                    className="form-textarea"
+                    onChange={handleAddressChange}
+                    onSelect={handleAddressSelect}
+                    placeholder="Начните вводить адрес..."
                   />
+                  {coordinates && (
+                    <p className="address-confirmed">✓ Адрес подтверждён</p>
+                  )}
                 </div>
 
                 {error && (
