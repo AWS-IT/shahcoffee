@@ -2,10 +2,17 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import { 
   initDatabase, 
   upsertUser, 
   getUserByTelegramId, 
+  getUserByEmail,
+  getUserById,
+  createUserWithEmail,
+  linkTelegramToUser,
+  isUserAdmin,
   createOrder, 
   updateOrderStatus, 
   getOrderById, 
@@ -23,6 +30,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // Для form-data от Robokassa
+
+const JWT_SECRET = process.env.JWT_SECRET || 'shahcoffee-secret-key-2026';
 
 // Инициализация БД при старте
 initDatabase().catch(console.error);
@@ -580,13 +589,20 @@ app.post('/api/auth/telegram', async (req, res) => {
       auth_date: parseInt(auth_date),
     });
 
+    // Создаём JWT токен
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
+
     res.json({
       success: true,
-      user,
+      token,
+      user: {
+        ...user,
+        is_admin: false // По умолчанию новые пользователи не админы
+      },
     });
   } catch (dbError) {
     console.error('❌ Ошибка сохранения пользователя в БД:', dbError);
-    // Возвращаем успех даже если БД недоступна
+    // Возвращаем успех даже если БД недоступна (без токена)
     res.json({
       success: true,
       user: {
@@ -700,19 +716,246 @@ app.get('/api/users/:userId/orders', async (req, res) => {
 });
 
 // Чтение профиля пользователя (требует авторизации)
-app.get('/api/auth/profile', (req, res) => {
-  // В production здесь должна быть проверка JWT токена
-  const userData = req.headers.authorization?.split(' ')[1];
+app.get('/api/auth/profile', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
   
-  if (!userData) {
+  if (!token) {
     return res.status(401).json({ error: 'Not authenticated' });
   }
 
-  // Декодируем/верифицируем токен
-  res.json({ success: true, message: 'User profile' });
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await getUserById(decoded.userId);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json({ 
+      success: true, 
+      user: {
+        id: user.id,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        username: user.username,
+        phone: user.phone,
+        photo_url: user.photo_url,
+        telegram_id: user.telegram_id,
+        is_admin: user.is_admin === 1
+      }
+    });
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+// ========== РЕГИСТРАЦИЯ И ВХОД ПО EMAIL ==========
+
+// Регистрация
+app.post('/api/auth/register', async (req, res) => {
+  const { email, password, firstName, phone } = req.body;
+  
+  if (!email || !password || !firstName) {
+    return res.status(400).json({ error: 'Email, пароль и имя обязательны' });
+  }
+  
+  if (password.length < 6) {
+    return res.status(400).json({ error: 'Пароль должен быть минимум 6 символов' });
+  }
+  
+  try {
+    // Проверяем, существует ли пользователь
+    const existingUser = await getUserByEmail(email);
+    if (existingUser) {
+      return res.status(400).json({ error: 'Пользователь с таким email уже существует' });
+    }
+    
+    // Хешируем пароль
+    const passwordHash = await bcrypt.hash(password, 10);
+    
+    // Создаём пользователя
+    const user = await createUserWithEmail(email, passwordHash, firstName, phone);
+    
+    // Создаём JWT токен
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
+    
+    console.log(`✓ Зарегистрирован новый пользователь: ${email}`);
+    
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        first_name: user.first_name,
+        phone: user.phone
+      }
+    });
+  } catch (error) {
+    console.error('❌ Ошибка регистрации:', error);
+    res.status(500).json({ error: 'Ошибка регистрации' });
+  }
+});
+
+// Вход по email/паролю
+app.post('/api/auth/login', async (req, res) => {
+  const { email, password } = req.body;
+  
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Email и пароль обязательны' });
+  }
+  
+  try {
+    const user = await getUserByEmail(email);
+    
+    if (!user || !user.password_hash) {
+      return res.status(401).json({ error: 'Неверный email или пароль' });
+    }
+    
+    const isValid = await bcrypt.compare(password, user.password_hash);
+    
+    if (!isValid) {
+      return res.status(401).json({ error: 'Неверный email или пароль' });
+    }
+    
+    // Создаём JWT токен
+    const token = jwt.sign({ userId: user.id }, JWT_SECRET, { expiresIn: '30d' });
+    
+    console.log(`✓ Вход пользователя: ${email}`);
+    
+    res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        username: user.username,
+        phone: user.phone,
+        photo_url: user.photo_url,
+        telegram_id: user.telegram_id,
+        is_admin: user.is_admin === 1
+      }
+    });
+  } catch (error) {
+    console.error('❌ Ошибка входа:', error);
+    res.status(500).json({ error: 'Ошибка входа' });
+  }
+});
+
+// Привязка Telegram к аккаунту
+app.post('/api/auth/link-telegram', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  
+  if (!token) {
+    return res.status(401).json({ error: 'Not authenticated' });
+  }
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const { id, first_name, last_name, username, photo_url, auth_date, hash } = req.body;
+    
+    // Проверяем Telegram данные
+    const dataToVerify = { ...req.body };
+    if (!verifyTelegramHash(dataToVerify, TELEGRAM_BOT_TOKEN)) {
+      return res.status(401).json({ error: 'Invalid Telegram hash' });
+    }
+    
+    // Проверяем, не привязан ли уже этот Telegram к другому аккаунту
+    const existingTgUser = await getUserByTelegramId(id);
+    if (existingTgUser && existingTgUser.id !== decoded.userId) {
+      return res.status(400).json({ error: 'Этот Telegram уже привязан к другому аккаунту' });
+    }
+    
+    // Привязываем
+    const updatedUser = await linkTelegramToUser(decoded.userId, {
+      id, first_name, last_name, username, photo_url, auth_date
+    });
+    
+    console.log(`✓ Telegram привязан к пользователю: ${updatedUser.email}`);
+    
+    res.json({
+      success: true,
+      user: {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        first_name: updatedUser.first_name,
+        last_name: updatedUser.last_name,
+        username: updatedUser.username,
+        phone: updatedUser.phone,
+        photo_url: updatedUser.photo_url,
+        telegram_id: updatedUser.telegram_id,
+        is_admin: updatedUser.is_admin === 1
+      }
+    });
+  } catch (error) {
+    console.error('❌ Ошибка привязки Telegram:', error);
+    res.status(500).json({ error: 'Ошибка привязки Telegram' });
+  }
+});
+
+// Проверка прав администратора
+app.get('/api/auth/check-admin', async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  
+  if (!token) {
+    return res.status(401).json({ error: 'Not authenticated', isAdmin: false });
+  }
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const admin = await isUserAdmin(decoded.userId);
+    res.json({ isAdmin: admin });
+  } catch (error) {
+    res.status(401).json({ error: 'Invalid token', isAdmin: false });
+  }
 });
 
 // ========== END TELEGRAM AUTH ==========
+
+// Middleware для проверки авторизации
+const requireAuth = async (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  
+  if (!token) {
+    return res.status(401).json({ error: 'Требуется авторизация' });
+  }
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const user = await getUserById(decoded.userId);
+    if (!user) {
+      return res.status(401).json({ error: 'Пользователь не найден' });
+    }
+    req.user = user;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Неверный токен' });
+  }
+};
+
+// Middleware для проверки прав администратора
+const requireAdmin = async (req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  
+  if (!token) {
+    return res.status(401).json({ error: 'Требуется авторизация' });
+  }
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const admin = await isUserAdmin(decoded.userId);
+    if (!admin) {
+      return res.status(403).json({ error: 'Недостаточно прав. Требуется доступ администратора.' });
+    }
+    req.userId = decoded.userId;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Неверный токен' });
+  }
+};
 
 // ==================== API МЕТОК НА КАРТЕ ====================
 
@@ -727,8 +970,8 @@ app.get('/api/markers', async (req, res) => {
   }
 });
 
-// Получить все метки (админка)
-app.get('/api/admin/markers', async (req, res) => {
+// Получить все метки (админка - требует админ права)
+app.get('/api/admin/markers', requireAdmin, async (req, res) => {
   try {
     const markers = await getAllMapMarkers();
     res.json(markers);
@@ -738,8 +981,8 @@ app.get('/api/admin/markers', async (req, res) => {
   }
 });
 
-// Создать метку (админка)
-app.post('/api/admin/markers', async (req, res) => {
+// Создать метку (админка - требует админ права)
+app.post('/api/admin/markers', requireAdmin, async (req, res) => {
   try {
     const { title, description, address, lat, lon, icon_color } = req.body;
     
@@ -756,8 +999,8 @@ app.post('/api/admin/markers', async (req, res) => {
   }
 });
 
-// Обновить метку (админка)
-app.put('/api/admin/markers/:id', async (req, res) => {
+// Обновить метку (админка - требует админ права)
+app.put('/api/admin/markers/:id', requireAdmin, async (req, res) => {
   try {
     const { title, description, address, lat, lon, icon_color, is_active } = req.body;
     const marker = await updateMapMarker(req.params.id, { 
@@ -771,8 +1014,8 @@ app.put('/api/admin/markers/:id', async (req, res) => {
   }
 });
 
-// Удалить метку (админка)
-app.delete('/api/admin/markers/:id', async (req, res) => {
+// Удалить метку (админка - требует админ права)
+app.delete('/api/admin/markers/:id', requireAdmin, async (req, res) => {
   try {
     await deleteMapMarker(req.params.id);
     console.log('✓ Метка удалена:', req.params.id);

@@ -1,8 +1,14 @@
 import React, { useState, useEffect } from 'react'
+import { Navigate } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
 import AddressSuggest from '../components/AddressSuggest'
 import '../styles/admin.css'
 
 export default function Admin() {
+  const { isAuthenticated, isAdmin, token, checkAdmin } = useAuth()
+  const [hasAccess, setHasAccess] = useState(null) // null = загрузка, true/false = результат
+  const [accessError, setAccessError] = useState('')
+  
   // Состояние для меток
   const [markers, setMarkers] = useState([])
   const [markersLoading, setMarkersLoading] = useState(false)
@@ -19,14 +25,49 @@ export default function Admin() {
     is_active: true
   })
 
+  // Проверка доступа при загрузке
   useEffect(() => {
-    loadMarkers()
-  }, [])
+    const verifyAccess = async () => {
+      if (!isAuthenticated || !token) {
+        setHasAccess(false)
+        setAccessError('Требуется авторизация')
+        return
+      }
+      
+      const adminStatus = await checkAdmin()
+      setHasAccess(adminStatus)
+      if (!adminStatus) {
+        setAccessError('У вас нет прав администратора')
+      }
+    }
+    
+    verifyAccess()
+  }, [isAuthenticated, token, checkAdmin])
+
+  useEffect(() => {
+    if (hasAccess) {
+      loadMarkers()
+    }
+  }, [hasAccess])
+
+  const getAuthHeaders = () => ({
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  })
 
   const loadMarkers = async () => {
     setMarkersLoading(true)
     try {
-      const response = await fetch('/api/admin/markers')
+      const response = await fetch('/api/admin/markers', {
+        headers: getAuthHeaders()
+      })
+      
+      if (response.status === 403) {
+        setHasAccess(false)
+        setAccessError('Доступ запрещён')
+        return
+      }
+      
       const data = await response.json()
       if (Array.isArray(data)) {
         setMarkers(data)
@@ -36,6 +77,38 @@ export default function Admin() {
     } finally {
       setMarkersLoading(false)
     }
+  }
+
+  // Показываем загрузку пока проверяем доступ
+  if (hasAccess === null) {
+    return (
+      <div className="admin-page">
+        <div className="admin-container">
+          <div className="admin-loading">
+            <p>Проверка доступа...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Если нет доступа - показываем ошибку
+  if (!hasAccess) {
+    return (
+      <div className="admin-page">
+        <div className="admin-container">
+          <div className="admin-access-denied">
+            <h1>🔒 Доступ запрещён</h1>
+            <p>{accessError}</p>
+            {!isAuthenticated ? (
+              <a href="/login" className="btn-primary">Войти в аккаунт</a>
+            ) : (
+              <a href="/" className="btn-primary">На главную</a>
+            )}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const handleAddressSelect = (suggestion) => {
@@ -77,7 +150,7 @@ export default function Admin() {
       
       const response = await fetch(url, {
         method: editingMarker ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getAuthHeaders(),
         body: JSON.stringify(markerForm)
       })
 
@@ -85,7 +158,8 @@ export default function Admin() {
         loadMarkers()
         resetMarkerForm()
       } else {
-        alert('Ошибка сохранения метки')
+        const data = await response.json()
+        alert(data.error || 'Ошибка сохранения метки')
       }
     } catch (error) {
       console.error('Ошибка:', error)
@@ -112,7 +186,10 @@ export default function Admin() {
     if (!confirm('Удалить метку?')) return
     
     try {
-      await fetch(`/api/admin/markers/${id}`, { method: 'DELETE' })
+      await fetch(`/api/admin/markers/${id}`, { 
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      })
       loadMarkers()
     } catch (error) {
       console.error('Ошибка удаления:', error)

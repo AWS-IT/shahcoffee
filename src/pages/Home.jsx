@@ -2,7 +2,6 @@ import Hero from '../components/Hero.jsx';
 import About from '../components/About.jsx';
 import CatalogPreview from '../components/CatalogPreview.jsx';
 import ConstructorPromo from '../components/ConstructorPromo.jsx';
-import MapSection from '../components/MapSection.jsx';
 import DeliverySection from '../components/DeliverySection.jsx'
 import HomeMap from '../components/HomeMap.jsx'
 
@@ -11,11 +10,10 @@ export default function Home() {
     <>
       <Hero />
       <About id="about" />
-      <HomeMap />
+      <section id="dvs"><HomeMap /></section>
       <section id="catalog"><CatalogPreview /></section>
       <DeliverySection/>
       {/*<ConstructorPromo id="constructor" />*/}
-      <MapSection id="contacts" />
     </>
   );
 }

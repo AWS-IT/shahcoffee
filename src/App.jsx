@@ -13,6 +13,7 @@ import PaymentTestPage from './pages/PaymentTestPage.jsx'
 import ProductPage from './pages/ProductPage.jsx'
 import OrderPage from './pages/OrderPage.jsx'
 import ProfilePage from './pages/ProfilePage.jsx'
+import LoginPage from './pages/LoginPage.jsx'
 import Admin from './pages/Admin.jsx'
 
 function AppContent() {
@@ -53,6 +54,7 @@ function AppContent() {
           <Route path="/payment-result" element={<PaymentResultPage />} />
           <Route path="/order" element={<OrderPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/test-payment" element={<PaymentTestPage />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/" element={<Home />} />

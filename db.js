@@ -46,19 +46,24 @@ export async function initDatabase() {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
 
-    // Таблица для пользователей (авторизация через Telegram)
+    // Таблица для пользователей (авторизация через Telegram или email/пароль)
     await connection.query(`
       CREATE TABLE IF NOT EXISTS users (
-        id BIGINT PRIMARY KEY,
-        telegram_id BIGINT UNIQUE NOT NULL,
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        email VARCHAR(255) UNIQUE,
+        password_hash VARCHAR(255),
+        telegram_id BIGINT UNIQUE,
         first_name VARCHAR(255),
         last_name VARCHAR(255),
         username VARCHAR(255),
+        phone VARCHAR(50),
         photo_url TEXT,
+        is_admin BOOLEAN DEFAULT FALSE,
         auth_date TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_telegram_id (telegram_id),
+        INDEX idx_email (email),
         INDEX idx_username (username)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
@@ -182,20 +187,62 @@ export async function setSetting(key, value) {
 export async function upsertUser(userData) {
   const { id, first_name, last_name, username, photo_url, auth_date } = userData;
   
-  await pool.query(
-    `INSERT INTO users (id, telegram_id, first_name, last_name, username, photo_url, auth_date)
-     VALUES (?, ?, ?, ?, ?, ?, FROM_UNIXTIME(?))
-     ON DUPLICATE KEY UPDATE
-       first_name = VALUES(first_name),
-       last_name = VALUES(last_name),
-       username = VALUES(username),
-       photo_url = VALUES(photo_url),
-       auth_date = VALUES(auth_date),
-       updated_at = CURRENT_TIMESTAMP`,
-    [id, id, first_name, last_name || null, username || null, photo_url || null, auth_date || Math.floor(Date.now() / 1000)]
+  // Проверяем, есть ли пользователь с таким telegram_id
+  const [existing] = await pool.query(
+    'SELECT id FROM users WHERE telegram_id = ?',
+    [id]
   );
   
-  return { id, first_name, last_name, username, photo_url };
+  if (existing.length > 0) {
+    // Обновляем существующего
+    await pool.query(
+      `UPDATE users SET 
+        first_name = ?, last_name = ?, username = ?, photo_url = ?, 
+        auth_date = FROM_UNIXTIME(?), updated_at = CURRENT_TIMESTAMP
+       WHERE telegram_id = ?`,
+      [first_name, last_name || null, username || null, photo_url || null, 
+       auth_date || Math.floor(Date.now() / 1000), id]
+    );
+    return { id: existing[0].id, telegram_id: id, first_name, last_name, username, photo_url };
+  }
+  
+  // Создаём нового
+  const [result] = await pool.query(
+    `INSERT INTO users (telegram_id, first_name, last_name, username, photo_url, auth_date)
+     VALUES (?, ?, ?, ?, ?, FROM_UNIXTIME(?))`,
+    [id, first_name, last_name || null, username || null, photo_url || null, 
+     auth_date || Math.floor(Date.now() / 1000)]
+  );
+  
+  return { id: result.insertId, telegram_id: id, first_name, last_name, username, photo_url };
+}
+
+// Регистрация через email/пароль
+export async function createUserWithEmail(email, passwordHash, firstName, phone = null) {
+  const [result] = await pool.query(
+    `INSERT INTO users (email, password_hash, first_name, phone)
+     VALUES (?, ?, ?, ?)`,
+    [email, passwordHash, firstName, phone]
+  );
+  return { id: result.insertId, email, first_name: firstName, phone };
+}
+
+// Получить пользователя по email
+export async function getUserByEmail(email) {
+  const [rows] = await pool.query(
+    'SELECT * FROM users WHERE email = ?',
+    [email]
+  );
+  return rows[0] || null;
+}
+
+// Получить пользователя по ID
+export async function getUserById(userId) {
+  const [rows] = await pool.query(
+    'SELECT * FROM users WHERE id = ?',
+    [userId]
+  );
+  return rows[0] || null;
 }
 
 // Получить пользователя по Telegram ID
@@ -205,6 +252,44 @@ export async function getUserByTelegramId(telegramId) {
     [telegramId]
   );
   return rows[0] || null;
+}
+
+// Привязать Telegram к существующему аккаунту
+export async function linkTelegramToUser(userId, telegramData) {
+  const { id, first_name, last_name, username, photo_url, auth_date } = telegramData;
+  
+  await pool.query(
+    `UPDATE users SET 
+      telegram_id = ?, 
+      first_name = COALESCE(first_name, ?),
+      last_name = COALESCE(last_name, ?),
+      username = COALESCE(username, ?),
+      photo_url = COALESCE(photo_url, ?),
+      auth_date = FROM_UNIXTIME(?),
+      updated_at = CURRENT_TIMESTAMP
+     WHERE id = ?`,
+    [id, first_name, last_name || null, username || null, photo_url || null, 
+     auth_date || Math.floor(Date.now() / 1000), userId]
+  );
+  
+  return getUserById(userId);
+}
+
+// Проверить, является ли пользователь админом
+export async function isUserAdmin(userId) {
+  const [rows] = await pool.query(
+    'SELECT is_admin FROM users WHERE id = ?',
+    [userId]
+  );
+  return rows[0]?.is_admin === 1;
+}
+
+// Сделать пользователя админом
+export async function setUserAdmin(userId, isAdmin = true) {
+  await pool.query(
+    'UPDATE users SET is_admin = ? WHERE id = ?',
+    [isAdmin ? 1 : 0, userId]
+  );
 }
 
 // ==================== ЗАКАЗЫ ====================
