@@ -1,45 +1,49 @@
 /* Login Page Styles */
 .login-page {
-  min-height: 80vh;
-  padding: 60px 20px;
+  min-height: calc(100vh - 80px);
+  padding: 100px 20px 60px;
+  margin-top: 80px;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   background: linear-gradient(135deg, #f6f1e9 0%, #fff 100%);
 }
 
 .login-card {
   width: 100%;
-  max-width: 420px;
+  max-width: 800px;
   background: white;
-  padding: 40px;
+  padding: 60px 80px;
   border-radius: 24px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
 }
 
 .login-card h1 {
-  font-size: 28px;
+  font-size: 36px;
   color: #2b2620;
   text-align: center;
-  margin-bottom: 24px;
+  margin-bottom: 32px;
 }
 
 .login-tabs {
   display: flex;
-  gap: 8px;
-  margin-bottom: 24px;
+  gap: 12px;
+  margin-bottom: 32px;
   background: #f5f5f5;
-  padding: 4px;
-  border-radius: 12px;
+  padding: 6px;
+  border-radius: 14px;
+  max-width: 320px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .login-tab {
   flex: 1;
-  padding: 12px 16px;
+  padding: 14px 24px;
   background: transparent;
   border: none;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   color: #666;
   cursor: pointer;
@@ -69,26 +73,28 @@
 .login-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 24px;
+  max-width: 500px;
+  margin: 0 auto;
 }
 
 .login-form .form-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .login-form label {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 500;
   color: #333;
 }
 
 .login-form input {
-  padding: 14px 16px;
+  padding: 18px 24px;
   border: 2px solid #e5e5e5;
-  border-radius: 12px;
-  font-size: 16px;
+  border-radius: 14px;
+  font-size: 17px;
   transition: all 0.2s ease;
 }
 
@@ -99,11 +105,11 @@
 }
 
 .login-btn {
-  margin-top: 8px;
-  padding: 16px;
-  font-size: 16px;
+  margin-top: 16px;
+  padding: 18px;
+  font-size: 18px;
   font-weight: 600;
-  border-radius: 12px;
+  border-radius: 14px;
   background: #008B9D;
   color: white;
   border: none;
@@ -124,8 +130,11 @@
 .login-divider {
   display: flex;
   align-items: center;
-  margin: 24px 0;
-  gap: 16px;
+  margin: 32px 0;
+  gap: 20px;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .login-divider::before,
@@ -137,7 +146,7 @@
 }
 
 .login-divider span {
-  font-size: 13px;
+  font-size: 14px;
   color: #999;
 }
 
@@ -146,9 +155,9 @@
 }
 
 .login-telegram p {
-  font-size: 14px;
+  font-size: 16px;
   color: #666;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .login-telegram .telegram-login {
@@ -158,9 +167,9 @@
 .login-back {
   display: block;
   text-align: center;
-  margin-top: 24px;
+  margin-top: 32px;
   color: #666;
-  font-size: 14px;
+  font-size: 16px;
   text-decoration: none;
   transition: color 0.2s ease;
 }
@@ -170,13 +179,26 @@
 }
 
 /* Mobile */
-@media (max-width: 480px) {
+@media (max-width: 768px) {
+  .login-page {
+    padding: 80px 16px 40px;
+    margin-top: 60px;
+  }
+
   .login-card {
-    padding: 24px 20px;
-    margin: 0 10px;
+    padding: 40px 24px;
+    margin: 0;
   }
 
   .login-card h1 {
-    font-size: 24px;
+    font-size: 28px;
+  }
+
+  .login-form {
+    max-width: 100%;
+  }
+
+  .login-divider {
+    max-width: 100%;
   }
 }
