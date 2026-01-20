@@ -374,10 +374,12 @@ async function createMoySkladShipment(orderId, orderData) {
     // 5. Создаем отгрузку
     const shipmentPayload = {
       name: `Заказ №${orderId}`,
-      description: `Оплачен через Robokassa\nТелефон: ${customerData.phone}\nАдрес: ${customerData.address}`,
+      description: `Телефон: ${customerData.phone}\nАдрес: ${customerData.address}`,
       agent: { meta: counterparty.meta },
       organization: { meta: organization.meta },
       store: { meta: store.meta },
+      payedSum: totalPrice * 100, // Сумма оплаты в копейках
+      applicable: true, // Проведён
       positions: positions
     };
     
@@ -400,6 +402,42 @@ async function createMoySkladShipment(orderId, orderData) {
     
     const result = await shipmentResponse.json();
     console.log('✓ Отгрузка создана:', result.name, result.id);
+    
+    // 6. Создаём входящий платёж для отгрузки
+    try {
+      const paymentPayload = {
+        sum: totalPrice * 100, // Сумма в копейках
+        organization: { meta: organization.meta },
+        agent: { meta: counterparty.meta },
+        operations: [
+          {
+            meta: result.meta,
+            linkedSum: totalPrice * 100
+          }
+        ],
+        paymentPurpose: `Оплата заказа №${orderId} через Robokassa`
+      };
+      
+      const paymentResponse = await fetch(`${ADMIN_API_URL}/api/remap/1.2/entity/paymentin`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${ADMIN_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(paymentPayload)
+      });
+      
+      if (paymentResponse.ok) {
+        const payment = await paymentResponse.json();
+        console.log('✓ Входящий платёж создан:', payment.id);
+      } else {
+        console.error('⚠️ Не удалось создать входящий платёж');
+      }
+    } catch (paymentError) {
+      console.error('⚠️ Ошибка создания платежа:', paymentError);
+      // Не бросаем ошибку, т.к. отгрузка уже создана
+    }
+    
     return result;
     
   } catch (error) {
