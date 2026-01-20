@@ -1,12 +1,17 @@
 /* Login Page Styles */
 .login-page {
-  min-height: calc(100vh - 80px);
+  min-height: 100vh;
   padding: 100px 20px 60px;
-  margin-top: 80px;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #f6f1e9 0%, #fff 100%);
+  background: #f6f1e9;
+}
+
+/* Скрываем футер на странице логина */
+.login-page ~ footer,
+body:has(.login-page) .footer {
+  display: none;
 }
 
 .login-card {
@@ -162,6 +167,34 @@
 
 .login-telegram .telegram-login {
   justify-content: center;
+  min-height: 40px;
+}
+
+/* Fallback кнопка если iframe не загрузился */
+.login-telegram-fallback {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #0088cc 0%, #0077b5 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.login-telegram-fallback:hover {
+  background: linear-gradient(135deg, #0077b5 0%, #006699 100%);
+  transform: translateY(-1px);
+}
+
+.login-telegram-fallback svg {
+  width: 20px;
+  height: 20px;
 }
 
 .login-back {
@@ -182,7 +215,7 @@
 @media (max-width: 768px) {
   .login-page {
     padding: 80px 16px 40px;
-    margin-top: 60px;
+    min-height: 100vh;
   }
 
   .login-card {

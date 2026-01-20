@@ -126,7 +126,6 @@ export default function LoginPage() {
           </div>
 
           <div className="login-telegram">
-            <p>Войти через Telegram</p>
             <TelegramLoginButton />
           </div>
 
