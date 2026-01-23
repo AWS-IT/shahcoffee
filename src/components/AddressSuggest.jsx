@@ -1,8 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 
-// API ключ Яндекс Геокодера (бесплатно до 1000 запросов в день)
-// Получить можно на https://developer.tech.yandex.ru/
-const YANDEX_API_KEY = import.meta.env.VITE_YANDEX_GEOCODER_API_KEY || '';
+// API URL бэкенда
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 export default function AddressSuggest({ value, onChange, onSelect, placeholder = 'Введите адрес доставки' }) {
   const [suggestions, setSuggestions] = useState([]);
@@ -14,34 +13,25 @@ export default function AddressSuggest({ value, onChange, onSelect, placeholder 
   const suggestRef = useRef(null);
   const debounceRef = useRef(null);
 
-  // Поиск через Яндекс Геокодер (лучше для России)
+  // Поиск через наш сервер (прокси к Яндекс Геокодеру)
   const searchYandex = async (query) => {
-    if (!YANDEX_API_KEY) return null;
-    
     try {
       const response = await fetch(
-        `https://geocode-maps.yandex.ru/1.x/?apikey=${YANDEX_API_KEY}&format=json&geocode=${encodeURIComponent(query)}&results=5&lang=ru_RU`
+        `${API_URL}/api/geocode?query=${encodeURIComponent(query)}`
       );
       
       if (!response.ok) return null;
       
       const data = await response.json();
-      const results = data.response?.GeoObjectCollection?.featureMember || [];
       
-      return results.map((item) => {
-        const geo = item.GeoObject;
-        const coords = geo.Point.pos.split(' ');
-        return {
-          address: geo.metaDataProperty.GeocoderMetaData.text,
-          name: geo.name,
-          description: geo.description || '',
-          coordinates: {
-            lat: parseFloat(coords[1]),
-            lon: parseFloat(coords[0]),
-          },
+      if (data.results && data.results.length > 0) {
+        return data.results.map(item => ({
+          ...item,
           source: 'yandex',
-        };
-      });
+        }));
+      }
+      
+      return null;
     } catch (error) {
       console.error('Ошибка Яндекс Геокодера:', error);
       return null;

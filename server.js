@@ -40,6 +40,54 @@ app.get('/health', (req, res) => {
   res.json({ ok: true });
 });
 
+// === ЯНДЕКС ГЕОКОДЕР (прокси для обхода CORS) ===
+const YANDEX_GEOCODER_KEY = process.env.VITE_YANDEX_GEOCODER_API_KEY;
+
+app.get('/api/geocode', async (req, res) => {
+  const { query } = req.query;
+  
+  if (!query || query.length < 3) {
+    return res.json({ results: [] });
+  }
+  
+  if (!YANDEX_GEOCODER_KEY) {
+    console.error('❌ YANDEX_GEOCODER_API_KEY не задан');
+    return res.status(500).json({ error: 'Geocoder not configured' });
+  }
+  
+  try {
+    const url = `https://geocode-maps.yandex.ru/1.x/?apikey=${YANDEX_GEOCODER_KEY}&format=json&geocode=${encodeURIComponent(query)}&results=5&lang=ru_RU`;
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`Yandex API error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const featureMembers = data.response?.GeoObjectCollection?.featureMember || [];
+    
+    const results = featureMembers.map((item) => {
+      const geo = item.GeoObject;
+      const coords = geo.Point.pos.split(' ');
+      return {
+        address: geo.metaDataProperty.GeocoderMetaData.text,
+        name: geo.name,
+        description: geo.description || '',
+        coordinates: {
+          lat: parseFloat(coords[1]),
+          lon: parseFloat(coords[0]),
+        },
+      };
+    });
+    
+    console.log(`🗺️ Геокодер: "${query}" → ${results.length} результатов`);
+    res.json({ results });
+  } catch (error) {
+    console.error('Ошибка геокодера:', error);
+    res.status(500).json({ error: 'Geocoding failed' });
+  }
+});
+
 // Публичный токен
 const PUBLIC_TOKEN = process.env.VITE_MOYSKLAD_TOKEN;
 const ADMIN_TOKEN = process.env.VITE_MOYSKLAD_TOKEN;
