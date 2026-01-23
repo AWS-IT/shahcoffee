@@ -10,44 +10,7 @@ export default function AddressSuggest({ value, onChange, onSelect, placeholder 
   const suggestRef = useRef(null);
   const debounceRef = useRef(null);
 
-  // Поиск через Nominatim с фокусом на Чечню
-  const searchNominatim = async (query) => {
-    try {
-      // Добавляем "Чеченская Республика" для лучшего поиска местных адресов
-      const searchQuery = query.toLowerCase().includes('чечен') || query.toLowerCase().includes('грозн') 
-        ? query 
-        : `${query}, Чеченская Республика`;
-      
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=ru&limit=7&addressdetails=1`,
-        {
-          headers: {
-            'Accept-Language': 'ru',
-          },
-        }
-      );
-
-      if (!response.ok) return [];
-
-      const data = await response.json();
-      
-      return data.map((item) => ({
-        address: item.display_name,
-        name: item.name || item.display_name.split(',')[0],
-        description: item.display_name.split(',').slice(1).join(',').trim(),
-        coordinates: {
-          lat: parseFloat(item.lat),
-          lon: parseFloat(item.lon),
-        },
-        source: 'nominatim',
-      }));
-    } catch (error) {
-      console.error('Ошибка Nominatim:', error);
-      return [];
-    }
-  };
-
-  // Комбинированный поиск
+  // Поиск адресов через Nominatim (OpenStreetMap) - бесплатно и без ключа
   const searchAddress = useCallback(async (query) => {
     if (!query || query.length < 3) {
       setSuggestions([]);
@@ -57,7 +20,31 @@ export default function AddressSuggest({ value, onChange, onSelect, placeholder 
     setIsLoading(true);
 
     try {
-      const items = await searchNominatim(query);
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=ru&limit=5&addressdetails=1`,
+        {
+          headers: {
+            'Accept-Language': 'ru',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Ошибка запроса');
+      }
+
+      const data = await response.json();
+      
+      const items = data.map((item) => ({
+        address: item.display_name,
+        name: item.name || item.display_name.split(',')[0],
+        description: item.display_name.split(',').slice(1).join(',').trim(),
+        coordinates: {
+          lat: parseFloat(item.lat),
+          lon: parseFloat(item.lon),
+        },
+      }));
+
       console.log('Найдено адресов:', items.length, items);
       setSuggestions(items);
       setIsOpen(items.length > 0);
@@ -83,10 +70,25 @@ export default function AddressSuggest({ value, onChange, onSelect, placeholder 
     }, 300);
   };
 
+  // Извлечь номер дома из строки (например "Чехова 21" -> "21")
+  const extractHouseNumber = (text) => {
+    const match = text.match(/\s(\d+[а-яА-Яa-zA-Z]?(?:\/\d+)?)\s*$/);
+    return match ? match[1] : null;
+  };
+
   // Выбор адреса из списка
   const handleSelectAddress = (suggestion) => {
-    onChange(suggestion.address);
-    onSelect && onSelect(suggestion);
+    // Попробуем добавить номер дома, если он был в запросе но не в результате
+    const houseNumber = extractHouseNumber(value);
+    let finalAddress = suggestion.address;
+    
+    // Если в текущем вводе есть номер дома, а в выбранном адресе нет - добавим
+    if (houseNumber && !suggestion.address.match(/\d+[а-яА-Яa-zA-Z]?(?:\/\d+)?/)) {
+      finalAddress = `${suggestion.name} ${houseNumber}, ${suggestion.description}`;
+    }
+    
+    onChange(finalAddress);
+    onSelect && onSelect({ ...suggestion, address: finalAddress });
     setIsOpen(false);
     setSuggestions([]);
     setShowManualInput(false);
