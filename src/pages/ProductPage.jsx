@@ -52,7 +52,6 @@ export default function ProductPage() {
       priceRub,
       image: imageUrl // теперь точно будет нормальная ссылка
     }, quantity)
-    alert('Добавлено в корзину!')
   }
 
   return (
