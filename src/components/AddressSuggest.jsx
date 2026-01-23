@@ -1,8 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 
-// API URL бэкенда
-const API_URL = import.meta.env.VITE_API_URL || '';
-
 export default function AddressSuggest({ value, onChange, onSelect, placeholder = 'Введите адрес доставки' }) {
   const [suggestions, setSuggestions] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -13,36 +10,16 @@ export default function AddressSuggest({ value, onChange, onSelect, placeholder 
   const suggestRef = useRef(null);
   const debounceRef = useRef(null);
 
-  // Поиск через наш сервер (прокси к Яндекс Геокодеру)
-  const searchYandex = async (query) => {
-    try {
-      const response = await fetch(
-        `${API_URL}/api/geocode?query=${encodeURIComponent(query)}`
-      );
-      
-      if (!response.ok) return null;
-      
-      const data = await response.json();
-      
-      if (data.results && data.results.length > 0) {
-        return data.results.map(item => ({
-          ...item,
-          source: 'yandex',
-        }));
-      }
-      
-      return null;
-    } catch (error) {
-      console.error('Ошибка Яндекс Геокодера:', error);
-      return null;
-    }
-  };
-
-  // Поиск через Nominatim (резервный вариант)
+  // Поиск через Nominatim с фокусом на Чечню
   const searchNominatim = async (query) => {
     try {
+      // Добавляем "Чеченская Республика" для лучшего поиска местных адресов
+      const searchQuery = query.toLowerCase().includes('чечен') || query.toLowerCase().includes('грозн') 
+        ? query 
+        : `${query}, Чеченская Республика`;
+      
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=ru&limit=5&addressdetails=1`,
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=ru&limit=7&addressdetails=1`,
         {
           headers: {
             'Accept-Language': 'ru',
@@ -70,7 +47,7 @@ export default function AddressSuggest({ value, onChange, onSelect, placeholder 
     }
   };
 
-  // Комбинированный поиск - сначала Яндекс, потом Nominatim
+  // Комбинированный поиск
   const searchAddress = useCallback(async (query) => {
     if (!query || query.length < 3) {
       setSuggestions([]);
@@ -80,14 +57,7 @@ export default function AddressSuggest({ value, onChange, onSelect, placeholder 
     setIsLoading(true);
 
     try {
-      // Сначала пробуем Яндекс (лучше для России)
-      let items = await searchYandex(query);
-      
-      // Если Яндекс не дал результатов или недоступен, используем Nominatim
-      if (!items || items.length === 0) {
-        items = await searchNominatim(query);
-      }
-
+      const items = await searchNominatim(query);
       console.log('Найдено адресов:', items.length, items);
       setSuggestions(items);
       setIsOpen(items.length > 0);
