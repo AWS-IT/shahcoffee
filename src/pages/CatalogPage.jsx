@@ -20,7 +20,8 @@ export default function CatalogPage() {
         let url = '/api_ms/entity/product?expand=images&limit=100'
         if (storeId) {
           // Используем assortment с фильтром по складу для получения товаров с остатками
-          url = `/api_ms/entity/assortment?expand=images&limit=100&stockStore=https://api.moysklad.ru/api/remap/1.2/entity/store/${storeId}&filter=stockStore!=0`
+          // stockMode=positiveOnly - только товары с положительным остатком
+          url = `/api_ms/entity/assortment?expand=images&limit=100&stockStore=https://api.moysklad.ru/api/remap/1.2/entity/store/${storeId}&stockMode=positiveOnly`
         }
         
         const response = await fetch(url)
