@@ -49,23 +49,43 @@ app.get('/api/address-search', async (req, res) => {
     return res.json([]);
   }
   
+  // Используем Яндекс Геокодер - он лучше знает российские адреса!
+  const GEOCODER_KEY = process.env.VITE_YANDEX_GEOCODER_API_KEY;
+  
+  if (!GEOCODER_KEY) {
+    console.error('❌ VITE_YANDEX_GEOCODER_API_KEY не задан');
+    return res.status(500).json({ error: 'Geocoder not configured' });
+  }
+  
   try {
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=ru&limit=5&addressdetails=1`;
-    console.log(`🔍 Поиск адреса: ${q}`);
+    const url = `https://geocode-maps.yandex.ru/1.x/?apikey=${GEOCODER_KEY}&format=json&geocode=${encodeURIComponent(q)}&results=5&lang=ru_RU`;
+    console.log(`🔍 Поиск адреса (Yandex): ${q}`);
     
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'ShahCoffee/1.0 (shahshop.ru)', // Important for Nominatim!
-        'Accept-Language': 'ru'
-      }
-    });
+    const response = await fetch(url);
 
     if (!response.ok) {
-        throw new Error(`Nominatim error: ${response.status}`);
+      throw new Error(`Yandex Geocoder error: ${response.status}`);
     }
 
     const data = await response.json();
-    res.json(data);
+    const featureMembers = data.response?.GeoObjectCollection?.featureMember || [];
+    
+    // Преобразуем в формат, совместимый с Nominatim (для AddressSuggest.jsx)
+    const results = featureMembers.map((item, index) => {
+      const geo = item.GeoObject;
+      const coords = geo.Point.pos.split(' '); // lon lat
+      return {
+        place_id: index + 1,
+        lat: coords[1],
+        lon: coords[0],
+        display_name: geo.metaDataProperty.GeocoderMetaData.text,
+        name: geo.name,
+        addresstype: 'place'
+      };
+    });
+    
+    console.log(`✅ Найдено ${results.length} адресов`);
+    res.json(results);
   } catch (error) {
     console.error('❌ Ошибка поиска адреса:', error.message);
     res.status(500).json({ error: 'Address search failed' });
