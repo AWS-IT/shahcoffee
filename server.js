@@ -40,6 +40,38 @@ app.get('/health', (req, res) => {
   res.json({ ok: true });
 });
 
+
+// === NOMINATIM PROXY (Address Search) ===
+app.get('/api/address-search', async (req, res) => {
+  const { q } = req.query;
+  
+  if (!q || q.length < 3) {
+    return res.json([]);
+  }
+  
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=ru&limit=5&addressdetails=1`;
+    console.log(`🔍 Поиск адреса: ${q}`);
+    
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'ShahCoffee/1.0 (shahshop.ru)', // Important for Nominatim!
+        'Accept-Language': 'ru'
+      }
+    });
+
+    if (!response.ok) {
+        throw new Error(`Nominatim error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    res.json(data);
+  } catch (error) {
+    console.error('❌ Ошибка поиска адреса:', error.message);
+    res.status(500).json({ error: 'Address search failed' });
+  }
+});
+
 // === ЯНДЕКС ГЕОКОДЕР (прокси для обхода CORS) ===
 const YANDEX_GEOCODER_KEY = process.env.VITE_YANDEX_GEOCODER_API_KEY;
 
@@ -100,12 +132,14 @@ if (!PUBLIC_TOKEN) {
   process.exit(1);
 }
 
-// Прокси 
-app.use('/api_ms', async (req, res) => {
+// Прокси для МойСклад (используем app.all вместо app.use чтобы не перехватывать /api/*)
+app.all('/api_ms/*', async (req, res) => {
+  // Убираем /api_ms из пути
+  const msPath = req.path.replace('/api_ms', '');
   // Используем приватный API для полного доступа к товарам и данным
-  const url = `${ADMIN_API_URL}/api/remap/1.2${req.path}${req.url.includes('?') ? '?' + req.url.split('?')[1] : ''}`;
+  const url = `${ADMIN_API_URL}/api/remap/1.2${msPath}${req.url.includes('?') ? '?' + req.url.split('?')[1] : ''}`;
 
-  console.log(`\n📥 Входящий запрос: ${req.method} /api_ms${req.path}`);
+  console.log(`\n📥 Входящий запрос: ${req.method} ${req.path}`);
   console.log(`🔗 Формируем URL: ${url}`);
   console.log(`📋 Query string: ${req.url.includes('?') ? req.url.split('?')[1] : 'нет'}`);
   console.log(`🔑 TOKEN: ${PUBLIC_TOKEN ? `✓ (${PUBLIC_TOKEN.substring(0, 15)}...)` : '❌ нет'}`);
@@ -1049,6 +1083,7 @@ const requireAdmin = async (req, res, next) => {
 app.get('/api/markers', async (req, res) => {
   try {
     const markers = await getMapMarkers();
+    console.log(`📍 GET /api/markers - найдено ${markers.length} активных меток`);
     res.json(markers);
   } catch (error) {
     console.error('❌ Ошибка получения меток:', error);
