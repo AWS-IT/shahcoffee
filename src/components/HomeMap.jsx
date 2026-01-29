@@ -4,12 +4,14 @@ export default function HomeMap() {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const [markers, setMarkers] = useState([]);
+  const [ymapsReady, setYmapsReady] = useState(false);
 
   // Загружаем метки с сервера
   useEffect(() => {
     fetch('/api/markers')
       .then(res => res.json())
       .then(data => {
+        console.log('📍 Метки загружены:', data);
         if (Array.isArray(data)) {
           setMarkers(data);
         }
@@ -17,12 +19,13 @@ export default function HomeMap() {
       .catch(err => console.error('Ошибка загрузки меток:', err));
   }, []);
 
+  // Загружаем Yandex Maps API
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
     // Проверяем, загружен ли уже API
     if (window.ymaps) {
-      initMap();
+      window.ymaps.ready(() => setYmapsReady(true));
       return;
     }
 
@@ -32,7 +35,9 @@ export default function HomeMap() {
     script.async = true;
     document.head.appendChild(script);
 
-    script.onload = () => initMap();
+    script.onload = () => {
+      window.ymaps.ready(() => setYmapsReady(true));
+    };
 
     return () => {
       if (mapRef.current) {
@@ -42,38 +47,31 @@ export default function HomeMap() {
     };
   }, []);
 
-  // Обновляем метки на карте при изменении данных
+  // Инициализируем карту и добавляем метки когда ОБА готовы
   useEffect(() => {
-    if (mapRef.current && markers.length > 0) {
-      addMarkersToMap();
-    }
-  }, [markers]);
-
-  const initMap = () => {
-    if (!window.ymaps || !mapContainerRef.current) return;
-
-    window.ymaps.ready(() => {
-      if (mapRef.current) {
-        mapRef.current.destroy();
-      }
-
-      // Центр карты - Москва или первая метка
+    if (!ymapsReady || !mapContainerRef.current) return;
+    
+    // Создаём карту если её ещё нет
+    if (!mapRef.current) {
+      // Центр карты - первая метка или Москва
       const centerLat = markers[0]?.lat || 55.7558;
       const centerLon = markers[0]?.lon || 37.6173;
 
       const map = new window.ymaps.Map(mapContainerRef.current, {
-        center: [centerLat, centerLon],
+        center: [parseFloat(centerLat), parseFloat(centerLon)],
         zoom: 12,
         controls: ['zoomControl', 'fullscreenControl', 'geolocationControl'],
       });
 
       mapRef.current = map;
-      
-      if (markers.length > 0) {
-        addMarkersToMap();
-      }
-    });
-  };
+      console.log('🗺️ Карта создана');
+    }
+    
+    // Добавляем метки
+    if (markers.length > 0) {
+      addMarkersToMap();
+    }
+  }, [ymapsReady, markers]);
 
   const addMarkersToMap = () => {
     if (!mapRef.current || !window.ymaps) return;

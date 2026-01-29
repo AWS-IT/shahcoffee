@@ -6,36 +6,33 @@ export default function CatalogPreview() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api_ms/entity/product?expand=images&limit=100', {
-      method: 'GET'
-    })
-      .then(r => r.json())
-      .then(data => {
-        console.log('📦 Товары загружены:', data.rows?.length);
-        console.log('1️⃣ Первый товар:', data.rows[0]);
-        console.log('Изображение 1го:', data.rows[0]?.images?.rows?.[0]);
+    const loadProducts = async () => {
+      try {
+        // Сначала получаем выбранный склад
+        const settingsRes = await fetch('/api/settings/selected_store')
+        const settingsData = await settingsRes.json()
+        const storeId = settingsData.value
+        
+        // Формируем URL с фильтром по складу если он выбран
+        let url = '/api_ms/entity/product?expand=images&limit=100'
+        if (storeId) {
+          url = `/api_ms/entity/assortment?expand=images&limit=100&stockStore=https://api.moysklad.ru/api/remap/1.2/entity/store/${storeId}&filter=stockStore!=0`
+        }
+        
+        const response = await fetch(url)
+        const data = await response.json()
+        
+        console.log('📦 Товары загружены:', data.rows?.length)
         setProducts(data.rows || [])
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false))
-  }, [])
-
-  const loadProducts = async () => {
-    try {
-      const response = await fetch('/api/products')
-      const data = await response.json()
-      
-      if (response.ok && data.rows) {
-        setProducts(data.rows || [])
-      } else {
-        console.error('Ошибка загрузки товаров:', data)
+      } catch (error) {
+        console.error('Ошибка загрузки товаров:', error)
+      } finally {
+        setLoading(false)
       }
-    } catch (error) {
-      console.error('Ошибка загрузки товаров:', error)
-    } finally {
-      setLoading(false)
     }
-  }
+    
+    loadProducts()
+  }, [])
 
   const getPrice = (product) => {
     const price = product.salePrices?.find(p => p.priceType?.name === 'Цена продажи')

@@ -22,7 +22,9 @@ import {
   getAllMapMarkers,
   createMapMarker,
   updateMapMarker,
-  deleteMapMarker
+  deleteMapMarker,
+  getSetting,
+  setSetting
 } from './db.js';
 dotenv.config();
 
@@ -1098,6 +1100,62 @@ const requireAdmin = async (req, res, next) => {
     return res.status(401).json({ error: 'Неверный токен' });
   }
 };
+
+// ==================== API НАСТРОЕК ====================
+
+// Получить настройку (публичный)
+app.get('/api/settings/:key', async (req, res) => {
+  try {
+    const value = await getSetting(req.params.key);
+    res.json({ value: value || null });
+  } catch (error) {
+    console.error('❌ Ошибка получения настройки:', error);
+    res.status(500).json({ error: 'Failed to get setting' });
+  }
+});
+
+// Сохранить настройку (админка)
+app.post('/api/admin/settings/:key', requireAdmin, async (req, res) => {
+  try {
+    const { value } = req.body;
+    await setSetting(req.params.key, value);
+    console.log(`✓ Настройка сохранена: ${req.params.key} = ${value}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Ошибка сохранения настройки:', error);
+    res.status(500).json({ error: 'Failed to save setting' });
+  }
+});
+
+// Получить список складов из МойСклад (админка)
+app.get('/api/admin/stores', requireAdmin, async (req, res) => {
+  try {
+    const url = `${ADMIN_API_URL}/api/remap/1.2/entity/store`;
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${PUBLIC_TOKEN}`,
+        'Content-Type': 'application/json',
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`MoySklad error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const stores = (data.rows || []).map(store => ({
+      id: store.id,
+      name: store.name,
+      address: store.address || '',
+    }));
+    
+    console.log(`📦 Получено складов: ${stores.length}`);
+    res.json(stores);
+  } catch (error) {
+    console.error('❌ Ошибка получения складов:', error);
+    res.status(500).json({ error: 'Failed to get stores' });
+  }
+});
 
 // ==================== API МЕТОК НА КАРТЕ ====================
 

@@ -25,6 +25,12 @@ export default function Admin() {
     is_active: true
   })
 
+  // Состояние для складов
+  const [stores, setStores] = useState([])
+  const [selectedStore, setSelectedStore] = useState('')
+  const [storesLoading, setStoresLoading] = useState(false)
+  const [storeSaving, setStoreSaving] = useState(false)
+
   // Проверка доступа при загрузке
   useEffect(() => {
     const verifyAccess = async () => {
@@ -47,6 +53,8 @@ export default function Admin() {
   useEffect(() => {
     if (hasAccess) {
       loadMarkers()
+      loadStores()
+      loadSelectedStore()
     }
   }, [hasAccess])
 
@@ -54,6 +62,57 @@ export default function Admin() {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`
   })
+
+  // Загрузка списка складов
+  const loadStores = async () => {
+    setStoresLoading(true)
+    try {
+      const response = await fetch('/api/admin/stores', {
+        headers: getAuthHeaders()
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setStores(data)
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки складов:', error)
+    } finally {
+      setStoresLoading(false)
+    }
+  }
+
+  // Загрузка текущего выбранного склада
+  const loadSelectedStore = async () => {
+    try {
+      const response = await fetch('/api/settings/selected_store')
+      const data = await response.json()
+      if (data.value) {
+        setSelectedStore(data.value)
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки настройки склада:', error)
+    }
+  }
+
+  // Сохранение выбранного склада
+  const handleStoreChange = async (storeId) => {
+    setSelectedStore(storeId)
+    setStoreSaving(true)
+    try {
+      const response = await fetch('/api/admin/settings/selected_store', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ value: storeId })
+      })
+      if (response.ok) {
+        console.log('✓ Склад сохранён')
+      }
+    } catch (error) {
+      console.error('Ошибка сохранения склада:', error)
+    } finally {
+      setStoreSaving(false)
+    }
+  }
 
   const loadMarkers = async () => {
     setMarkersLoading(true)
@@ -200,6 +259,35 @@ export default function Admin() {
     <div className="admin-page">
       <div className="admin-container">
         <h1>Панель администратора</h1>
+
+        {/* Секция выбора склада */}
+        <div className="admin-card stores-section">
+          <h2>🏪 Склад для каталога</h2>
+          <p className="section-hint">Товары на сайте будут показываться только с выбранного склада</p>
+          
+          {storesLoading ? (
+            <p>Загрузка складов...</p>
+          ) : stores.length === 0 ? (
+            <p className="no-stores">Склады не найдены в МойСклад</p>
+          ) : (
+            <div className="store-selector">
+              <select 
+                value={selectedStore} 
+                onChange={(e) => handleStoreChange(e.target.value)}
+                disabled={storeSaving}
+              >
+                <option value="">-- Все склады --</option>
+                {stores.map(store => (
+                  <option key={store.id} value={store.id}>
+                    {store.name} {store.address ? `(${store.address})` : ''}
+                  </option>
+                ))}
+              </select>
+              {storeSaving && <span className="saving-indicator">💾 Сохранение...</span>}
+              {selectedStore && !storeSaving && <span className="saved-indicator">✅ Сохранено</span>}
+            </div>
+          )}
+        </div>
 
         <div className="admin-card markers-section">
           <div className="markers-header">
