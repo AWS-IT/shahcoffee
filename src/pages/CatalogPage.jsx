@@ -11,9 +11,10 @@ export default function CatalogPage() {
   useEffect(() => {
     const loadProducts = async () => {
       try {
-        // Фильтруем только товары из группы "ШАХ ШОП"
+        // Фильтруем только товары из группы "ШАХ ШОП" через assortment
         const SHAHSHOP_FOLDER_ID = 'b83c3cac-cc16-11f0-0a80-0ea000180ae3'
-        const url = `/api_ms/entity/product?expand=images&limit=100&filter=productFolder=https://api.moysklad.ru/api/remap/1.2/entity/productfolder/${SHAHSHOP_FOLDER_ID}`
+        const folderUrl = `https://api.moysklad.ru/api/remap/1.2/entity/productfolder/${SHAHSHOP_FOLDER_ID}`
+        const url = `/api_ms/entity/assortment?expand=images&limit=100&filter=productFolder=${encodeURIComponent(folderUrl)}`
         
         const response = await fetch(url)
         const data = await response.json()
