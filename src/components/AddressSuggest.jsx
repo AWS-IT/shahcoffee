@@ -20,13 +20,10 @@ export default function AddressSuggest({ value, onChange, onSelect, placeholder 
     setIsLoading(true);
 
     try {
+      // Используем наш прокси-сервер вместо прямого обращения к Nominatim
+      // Это решает проблему CORS и добавляет User-Agent
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=ru&limit=5&addressdetails=1`,
-        {
-          headers: {
-            'Accept-Language': 'ru',
-          },
-        }
+        `/api/address-search?q=${encodeURIComponent(query)}`
       );
 
       if (!response.ok) {

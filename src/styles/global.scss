@@ -483,8 +483,9 @@ textarea {
   font-weight: 600;
   color: #333;
   text-decoration: none;
-  padding: 16px 0;
+  padding: 12px;
   border-bottom: 1px solid #eee;
+  transition: color 0.3s;
 
   &:hover {
     color: #008B9D;
@@ -493,15 +494,41 @@ textarea {
 
 .header__mobile-cart {
   margin-top: 20px;
-  color: #e31937;
-  font-weight: 700;
-  border-bottom: 2px solid #e31937 !important;
+  font-weight: 700;  
+  &:hover {
+    color: #008B9D;
+  }
 }
 
 .header__mobile-auth {
   margin-top: auto;
-  padding-top: 30px;
-  border-top: 1px solid #eee;
+  padding: 20px 0;
+}
+
+.header__mobile-login-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 24px;
+  background: linear-gradient(135deg, #008B9D 0%, #006d7a 100%);
+  color: white;
+  text-decoration: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  
+  svg {
+    stroke: currentColor;
+  }
+
+  &:hover {
+    background: linear-gradient(135deg, #007a8a 0%, #005a66 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 139, 157, 0.3);
+  }
 }
 
 .header__mobile-user {

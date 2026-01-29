@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
-import TelegramLoginButton from './TelegramLoginButton.jsx'
 
 
 export default function Header({ isHome }) {
@@ -189,7 +188,13 @@ export default function Header({ isHome }) {
                   </button>
                 </div>
               ) : (
-                <TelegramLoginButton />
+                <NavLink to="/login" className="header__mobile-login-btn" onClick={closeMenu}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="20" height="20">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                  </svg>
+                  Войти
+                </NavLink>
               )}
             </div>
           </nav>
