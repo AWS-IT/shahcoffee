@@ -133,9 +133,9 @@ if (!PUBLIC_TOKEN) {
 }
 
 // Прокси для МойСклад (используем app.all вместо app.use чтобы не перехватывать /api/*)
-app.all('/api_ms/*', async (req, res) => {
+app.all('/api_ms/:path(*)', async (req, res) => {
   // Убираем /api_ms из пути
-  const msPath = req.path.replace('/api_ms', '');
+  const msPath = '/' + (req.params.path || '');
   // Используем приватный API для полного доступа к товарам и данным
   const url = `${ADMIN_API_URL}/api/remap/1.2${msPath}${req.url.includes('?') ? '?' + req.url.split('?')[1] : ''}`;
 
