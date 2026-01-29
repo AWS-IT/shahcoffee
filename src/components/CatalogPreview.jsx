@@ -8,17 +8,9 @@ export default function CatalogPreview() {
   useEffect(() => {
     const loadProducts = async () => {
       try {
-        // Сначала получаем выбранный склад
-        const settingsRes = await fetch('/api/settings/selected_store')
-        const settingsData = await settingsRes.json()
-        const storeId = settingsData.value
-        
-        // Формируем URL с фильтром по складу если он выбран
-        let url = '/api_ms/entity/product?expand=images&limit=100'
-        if (storeId) {
-          // stockMode=positiveOnly - только товары с положительным остатком
-          url = `/api_ms/entity/assortment?expand=images&limit=100&stockStore=https://api.moysklad.ru/api/remap/1.2/entity/store/${storeId}&stockMode=positiveOnly`
-        }
+        // Используем только "Основной склад"
+        const MAIN_STORE_ID = '4eaa42e7-c91c-11f0-0a80-07df0076940d'
+        const url = `/api_ms/entity/assortment?expand=images&limit=100&stockStore=https://api.moysklad.ru/api/remap/1.2/entity/store/${MAIN_STORE_ID}&stockMode=positiveOnly`
         
         const response = await fetch(url)
         const data = await response.json()
