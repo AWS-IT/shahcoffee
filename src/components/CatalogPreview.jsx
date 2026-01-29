@@ -8,14 +8,14 @@ export default function CatalogPreview() {
   useEffect(() => {
     const loadProducts = async () => {
       try {
-        // Используем только "Основной склад"
-        const MAIN_STORE_ID = '4eaa42e7-c91c-11f0-0a80-07df0076940d'
-        const url = `/api_ms/entity/assortment?expand=images&limit=100&stockStore=https://api.moysklad.ru/api/remap/1.2/entity/store/${MAIN_STORE_ID}&stockMode=positiveOnly`
+        // Фильтруем только товары из группы "ШАХ ШОП"
+        const SHAHSHOP_FOLDER_ID = 'b83c3cac-cc16-11f0-0a80-0ea000180ae3'
+        const url = `/api_ms/entity/product?expand=images&limit=100&filter=productFolder=https://api.moysklad.ru/api/remap/1.2/entity/productfolder/${SHAHSHOP_FOLDER_ID}`
         
         const response = await fetch(url)
         const data = await response.json()
         
-        console.log('📦 Товары загружены:', data.rows?.length)
+        console.log('📦 Товары ШАХ ШОП загружены:', data.rows?.length)
         setProducts(data.rows || [])
       } catch (error) {
         console.error('Ошибка загрузки товаров:', error)
