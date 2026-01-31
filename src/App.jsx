@@ -52,6 +52,8 @@ function AppContent() {
         <Routes>
           <Route path="/cart" element={<CartPage />} />
           <Route path="/payment-result" element={<PaymentResultPage />} />
+          <Route path="/payment/success" element={<PaymentResultPage />} />
+          <Route path="/payment/fail" element={<PaymentResultPage />} />
           <Route path="/order" element={<OrderPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/login" element={<LoginPage />} />

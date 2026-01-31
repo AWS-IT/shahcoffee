@@ -214,6 +214,244 @@ if (!ROBOKASSA_MERCHANT_ID || !ROBOKASSA_PASS1 || !ROBOKASSA_PASS2) {
   console.error('ОШИБКА! Проверь .env файл для Robokassa');
 }
 
+// --- T-Bank (тестовые и боевые) конфигурация ---
+const TBANK_TERMINAL = process.env.TBANK_TERMINAL; // Например: 1769767428862DEMO
+const TBANK_PASSWORD = process.env.TBANK_PASSWORD; // Пароль для формирования Token
+const TBANK_INIT_URL = process.env.TBANK_INIT_URL || ''; // Опционально: URL API инициации платежа от Т-Банка
+const TBANK_NOTIFICATION_URL = process.env.TBANK_NOTIFICATION_URL || '/api/tbank/notification';
+const TBANK_SUCCESS_URL = process.env.TBANK_SUCCESS_URL || '';
+const TBANK_FAIL_URL = process.env.TBANK_FAIL_URL || '';
+
+if (!TBANK_TERMINAL || !TBANK_PASSWORD) {
+  console.warn('⚠️ T-Bank credentials not set in .env — tests will use a mock PaymentURL unless TBANK_INIT_URL is configured');
+}
+
+// Helper: build token for T-Bank requests according to docs
+function buildTbankToken(params, password) {
+  // Include only root-level primitive params (exclude objects and arrays), then add Password
+  const pairs = [];
+  for (const key of Object.keys(params)) {
+    const v = params[key];
+    if (v === undefined || v === null) continue;
+    if (typeof v === 'object') continue; // exclude nested objects/arrays like DATA, Receipt
+    pairs.push({ k: key, v: String(v) });
+  }
+  pairs.push({ k: 'Password', v: String(password) });
+  // Sort alphabetically by key
+  pairs.sort((a, b) => a.k.localeCompare(b.k));
+  // Concatenate only values
+  const concat = pairs.map(p => p.v).join('');
+  const hash = crypto.createHash('sha256').update(concat, 'utf8').digest('hex');
+  
+  console.log('Token calculation:', { 
+    sorted_keys: pairs.map(p => p.k).join(', '),
+    concat_preview: concat.substring(0, 50) + '...',
+    token: hash 
+  });
+  
+  return hash;
+}
+
+// Endpoint: Инициировать платёж через T-Bank (backend должен вызывать метод Initiate и вернуть PaymentURL)
+app.post('/api/tbank/initiate', async (req, res) => {
+  const { orderId, amount, description, data } = req.body;
+
+  if (!orderId || !amount) {
+    return res.status(400).json({ error: 'Missing orderId or amount' });
+  }
+
+  // T-Bank принимает Amount в копейках в примерах — унифицируем: если передали дробное число, умножаем на 100
+  let amountKopecks;
+  if (Number.isInteger(amount)) {
+    amountKopecks = amount; // assume already in kopecks
+  } else {
+    const a = parseFloat(amount);
+    amountKopecks = Math.round(a * 100);
+  }
+
+  const params = {
+    TerminalKey: TBANK_TERMINAL,
+    Amount: amountKopecks,
+    OrderId: orderId,
+    Description: description || 'Оплата заказа',
+  };
+  
+  // Добавляем URLs для success/fail если они настроены
+  if (TBANK_SUCCESS_URL) params.SuccessURL = TBANK_SUCCESS_URL;
+  if (TBANK_FAIL_URL) params.FailURL = TBANK_FAIL_URL;
+  
+  if (data) params.DATA = data; // will be ignored for token calculation
+
+  const token = buildTbankToken(params, TBANK_PASSWORD);
+  params.Token = token;
+
+  console.log('T-Bank initiate params:', { ...params, Token: token.substring(0, 10) + '...' });
+
+  if (TBANK_INIT_URL) {
+    try {
+      console.log('Sending request to T-Bank:', TBANK_INIT_URL);
+      console.log('Request body:', JSON.stringify(params, null, 2));
+      
+      const response = await fetch(TBANK_INIT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      
+      console.log('Response status:', response.status, response.statusText);
+      const contentType = response.headers.get('content-type');
+      console.log('Response content-type:', contentType);
+      
+      const text = await response.text();
+      console.log('Response body (first 500 chars):', text.substring(0, 500));
+      
+      let json;
+      try {
+        json = JSON.parse(text);
+      } catch (parseErr) {
+        console.error('Failed to parse response as JSON:', parseErr.message);
+        return res.status(502).json({ 
+          error: 'Invalid JSON response from T-Bank', 
+          status: response.status,
+          contentType,
+          body: text.substring(0, 200)
+        });
+      }
+      
+      console.log('T-Bank response:', json);
+      
+      // Expect PaymentURL in response
+      const paymentUrl = json.PaymentURL || json.paymentUrl || json.paymentURL || json.PaymentUrl;
+      if (!paymentUrl) {
+        return res.status(502).json({ error: 'Invalid response from TBANK_INIT_URL', body: json });
+      }
+      return res.json({ PaymentURL: paymentUrl, Success: json.Success, PaymentId: json.PaymentId });
+    } catch (err) {
+      console.error('T-Bank initiate error:', err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  }
+  // Если TBANK_INIT_URL не настроен — возвращаем локальный mock URL для тестирования фронтенда
+  const localPort = process.env.PORT || 3001;
+  const mockUrl = `http://localhost:${localPort}/mock-payment/${encodeURIComponent(orderId)}?amount=${encodeURIComponent(params.Amount)}`;
+  return res.json({ PaymentURL: mockUrl, _debug: { params } });
+});
+
+// Простая страница mock-платежа для локального тестирования
+app.get('/mock-payment/:orderId', (req, res) => {
+  const { orderId } = req.params;
+  const amount = req.query.amount || '';
+  const successUrl = TBANK_SUCCESS_URL || '/payment-result';
+
+  const html = `<!doctype html>
+  <html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Mock Payment - ${orderId}</title>
+    <style>body{font-family:Arial,Helvetica,sans-serif;padding:40px;background:#f6f6f6} .card{background:white;padding:24px;border-radius:8px;max-width:640px;margin:0 auto} button{background:#008B9D;color:white;border:none;padding:12px 20px;border-radius:6px;font-size:16px;cursor:pointer}</style>
+  </head>
+  <body>
+    <div class="card">
+      <h2>Mock Payment</h2>
+      <p><strong>Order:</strong> ${orderId}</p>
+      <p><strong>Amount:</strong> ${amount} (kopecks)</p>
+      <p>This is a local mock of the payment provider. Click <em>Pay</em> to simulate a successful payment and send a notification to the server.</p>
+      <button id="pay">Pay</button>
+      <div id="status" style="margin-top:16px;color:#333"></div>
+    </div>
+    <script>
+      document.getElementById('pay').addEventListener('click', async () => {
+        const resp = await fetch('/api/tbank/simulate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: '${orderId}', amount: '${amount}' })
+        });
+        const text = await resp.text();
+        document.getElementById('status').innerText = 'Server response: ' + text;
+        if (resp.ok) {
+          // redirect to success URL
+          window.location.href = '${successUrl}';
+        }
+      });
+    </script>
+  </body>
+  </html>`;
+
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(html);
+});
+
+// Симуляция уведомления от T-Bank: сервер отправляет внутренний notification обработчик
+app.post('/api/tbank/simulate', async (req, res) => {
+  const { orderId, amount } = req.body;
+  if (!orderId) return res.status(400).send('Missing orderId');
+
+  const payload = {
+    TerminalKey: TBANK_TERMINAL,
+    Amount: String(amount || 0),
+    OrderId: orderId,
+    Status: 'CONFIRMED'
+  };
+
+  // Добавляем Token и отправляем в локальный notification handler
+  payload.Token = buildTbankToken(payload, TBANK_PASSWORD);
+
+  try {
+    // Call the notification handler logic by posting to the same route
+    const url = TBANK_NOTIFICATION_URL;
+    // since it's internal, call the handler directly using fetch to localhost
+    const localUrl = `http://localhost:${process.env.PORT || 3001}${url}`;
+    const r = await fetch(localUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const text = await r.text();
+    return res.status(r.status).send(text);
+  } catch (e) {
+    console.error('simulate notification error', e.message);
+    return res.status(500).send(e.message);
+  }
+});
+
+// Endpoint: Notification handler для T-Bank (обрабатывает POST уведомления)
+app.post(TBANK_NOTIFICATION_URL, async (req, res) => {
+  const payload = req.body || {};
+  console.log('T-Bank notification received:', payload);
+
+  const receivedToken = payload.Token;
+  if (!receivedToken) {
+    console.error('T-Bank notification missing Token');
+    return res.status(400).send('Bad Request');
+  }
+
+  // Recompute token from root-level fields (excluding Token) and compare
+  const copy = { ...payload };
+  delete copy.Token;
+
+  const expected = buildTbankToken(copy, TBANK_PASSWORD);
+  if (expected !== receivedToken) {
+    console.error('T-Bank notification token mismatch', { expected, receivedToken });
+    return res.status(403).send('Forbidden');
+  }
+
+  // Пример обработки: обновляем статус заказа, если есть OrderId и Status
+  const orderId = payload.OrderId || payload.OrderId;
+  const status = payload.Status;
+  console.log(`T-Bank: order=${orderId} status=${status}`);
+  if (orderId && status) {
+    try {
+      await updateOrderStatus(orderId, String(status).toLowerCase());
+      console.log(`Order ${orderId} status updated to ${status}`);
+    } catch (e) {
+      console.warn('Failed to update order status for T-Bank notification:', e.message);
+    }
+  }
+
+  // Возвращаем OK как требует Т-Банк
+  res.status(200).send('OK');
+});
+
 // Telegram уведомления
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_ADMIN_CHAT_ID = '8033066008';
@@ -1229,7 +1467,7 @@ app.delete('/api/admin/markers/:id', requireAdmin, async (req, res) => {
 
 // ========== END MAP MARKERS ==========
 
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
   console.log(`Сервер работает на http://localhost:${PORT}`);
 });

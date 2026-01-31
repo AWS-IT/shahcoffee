@@ -20,21 +20,26 @@ export default function PaymentTestPage() {
 
   const handleInitPayment = async () => {
     try {
-      const response = await fetch('/api/robokassa/init-payment', {
+      const response = await fetch('/api/tbank/initiate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           orderId: testOrderId,
-          amount: totalPrice.toFixed(2),
+          amount: totalPrice, // можно передавать как число (рубли) — backend конвертирует в копейки
           description: 'Тестовый заказ',
-          customerEmail: 'test@example.com'
+          data: { customerEmail: 'test@example.com' }
         })
       });
 
       const data = await response.json();
       console.log('Payment init response:', data);
-      alert('Инициирование платежа успешно!\nURL: ' + data.redirectUrl);
-      // window.location.href = data.redirectUrl; // Раскомментируйте для реального редиректа
+      if (data.PaymentURL) {
+        alert('Инициирование платежа успешно!\nPaymentURL: ' + data.PaymentURL);
+        // Для теста редиректим пользователя на PaymentURL
+        window.open(data.PaymentURL, '_blank');
+      } else {
+        alert('Ошибка инициации платежа: см. консоль');
+      }
     } catch (error) {
       console.error('Error:', error);
       alert('Ошибка: ' + error.message);
@@ -43,29 +48,34 @@ export default function PaymentTestPage() {
 
   const handleSimulatePaymentResult = async () => {
     try {
-      // Генерируем правильную MD5 подпись для теста
-      const sum = totalPrice.toFixed(2);
-      const signatureString = `CofeeShah:${sum}:${testOrderId}:W6APdxswwMX2e8qEVS35`;
-      
-      // Используем Web Crypto API для MD5 (упрощенная версия - в реале нужна библиотека)
-      // Для теста просто отправляем без подписи - сервер всё равно проверит
+      // Формируем поля, которые ожидает сервер Robokassa (InvId и OutSum)
+      const outSum = totalPrice.toFixed(2);
+
       const response = await fetch('/api/robokassa/result', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          OrderId: testOrderId,
-          Sum: sum,
-          SignatureValue: 'SKIP_FOR_TEST' // Сервер должен проверить подпись
+          InvId: testOrderId,   // Robokassa uses InvId
+          OutSum: outSum,       // Robokassa uses OutSum
+          SignatureValue: 'SKIP_FOR_TEST' // For real tests generate proper signature on backend or provide PASS2
         })
       });
 
-      const data = await response.json();
-      console.log('Result response:', data);
-      
-      if (data.ok) {
-        alert('✓ Результат платежа успешно обработан!\nЗаказ: ' + testOrderId);
+      // Server may return plain text on error (e.g. 'Bad request'), so handle non-JSON safely
+      const contentType = response.headers.get('content-type') || '';
+      let body;
+      if (contentType.includes('application/json')) {
+        body = await response.json();
       } else {
-        alert('Ошибка проверки подписи. Это нормально для теста.\nВ реальном режиме Robokassa отправит правильную подпись.');
+        body = await response.text();
+      }
+
+      console.log('Result response:', response.status, body);
+
+      if (response.ok) {
+        alert('✓ Результат платежа успешно обработан!\nЗаказ: ' + testOrderId + '\nОтвет: ' + JSON.stringify(body));
+      } else {
+        alert('Ошибка при обработке результата платежа: ' + (typeof body === 'string' ? body : JSON.stringify(body)));
       }
     } catch (error) {
       console.error('Error:', error);
@@ -106,7 +116,7 @@ export default function PaymentTestPage() {
             1️⃣ Инициировать платеж (init-payment)
           </button>
           <p className="test-description">
-            Отправляет запрос на сервер для получения URL редиректа на Robokassa
+            Отправляет запрос на сервер для получения `PaymentURL` от Т‑Банка (инициация платёжной сессии)
           </p>
 
           <button onClick={handleSimulatePaymentResult} className="test-btn test-btn-secondary">
