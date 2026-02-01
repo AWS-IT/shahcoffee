@@ -19,7 +19,7 @@ export default function ProfilePage() {
     try {
       // Загружаем заказы пользователя из БД
       if (user?.id) {
-        const response = await fetch(`/api/orders/user/${user.id}`);
+        const response = await fetch(`/api/users/${user.id}/orders`);
         if (response.ok) {
           const dbOrders = await response.json();
           setOrders(dbOrders);
