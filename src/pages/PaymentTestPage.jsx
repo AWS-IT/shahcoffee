@@ -46,36 +46,25 @@ export default function PaymentTestPage() {
     }
   };
 
-  const handleSimulatePaymentResult = async () => {
+  const handleSimulateNotification = async () => {
     try {
-      // Формируем поля, которые ожидает сервер Robokassa (InvId и OutSum)
-      const outSum = totalPrice.toFixed(2);
-
-      const response = await fetch('/api/robokassa/result', {
+      // Симулируем T-Bank notification для тестирования
+      const response = await fetch('/api/tbank/simulate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          InvId: testOrderId,   // Robokassa uses InvId
-          OutSum: outSum,       // Robokassa uses OutSum
-          SignatureValue: 'SKIP_FOR_TEST' // For real tests generate proper signature on backend or provide PASS2
+          orderId: testOrderId,
+          amount: Math.round(totalPrice * 100) // В копейках
         })
       });
 
-      // Server may return plain text on error (e.g. 'Bad request'), so handle non-JSON safely
-      const contentType = response.headers.get('content-type') || '';
-      let body;
-      if (contentType.includes('application/json')) {
-        body = await response.json();
-      } else {
-        body = await response.text();
-      }
-
-      console.log('Result response:', response.status, body);
+      const text = await response.text();
+      console.log('Simulate response:', response.status, text);
 
       if (response.ok) {
-        alert('✓ Результат платежа успешно обработан!\nЗаказ: ' + testOrderId + '\nОтвет: ' + JSON.stringify(body));
+        alert('✓ Уведомление успешно обработано!\nЗаказ: ' + testOrderId + '\nОтвет: ' + text);
       } else {
-        alert('Ошибка при обработке результата платежа: ' + (typeof body === 'string' ? body : JSON.stringify(body)));
+        alert('Ошибка при обработке уведомления: ' + text);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -119,11 +108,11 @@ export default function PaymentTestPage() {
             Отправляет запрос на сервер для получения `PaymentURL` от Т‑Банка (инициация платёжной сессии)
           </p>
 
-          <button onClick={handleSimulatePaymentResult} className="test-btn test-btn-secondary">
-            2️⃣ Имитировать результат платежа (result)
+          <button onClick={handleSimulateNotification} className="test-btn test-btn-secondary">
+            2️⃣ Симулировать T-Bank уведомление
           </button>
           <p className="test-description">
-            Имитирует callback от Robokassa (обычно сервер это обрабатывает, не браузер)
+            Симулирует callback от T-Bank (для локального тестирования)
           </p>
 
           <a href="/checkout" className="test-btn test-btn-checkout">

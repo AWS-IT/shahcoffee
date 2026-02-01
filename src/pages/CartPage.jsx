@@ -47,40 +47,11 @@ export default function CartPage() {
     setLoading(true)
 
     try {
-      // InvId должен быть коротким числом (до 9 цифр)
-      const orderId = String(Math.floor(Date.now() / 1000) % 1000000000)
+      // Генерируем orderId
+      const orderId = `order-${Date.now()}`
       const description = `Заказ кофе на имя ${formData.name}`
 
-      const response = await fetch('/api/robokassa/init-payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId,
-          amount: totalPrice.toFixed(2),
-          description,
-          customerEmail: formData.email,
-          // Отправляем данные заказа на сервер для создания отгрузки после оплаты
-          customerData: {
-            name: formData.name,
-            phone: formData.phone,
-            email: formData.email,
-            address: formData.address,
-          },
-          items: cart.map(item => ({
-            id: item.id,
-            name: item.name,
-            quantity: item.quantity,
-            priceRub: item.priceRub,
-          })),
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Ошибка при инициировании платежа')
-      }
-
-      const paymentData = await response.json()
-
+      // Сохраняем данные заказа в localStorage перед оплатой
       localStorage.setItem('pendingOrder', JSON.stringify({
         orderId,
         customerData: formData,
@@ -89,65 +60,35 @@ export default function CartPage() {
         totalPrice,
       }))
 
-      // Создаём и отправляем форму POST на Robokassa с правильными параметрами
-      const form = document.createElement('form')
-      form.method = 'POST'
-      form.action = 'https://auth.robokassa.ru/Merchant/Index.aspx'
-      form.style.display = 'none'
-      
-      // MerchantLogin
-      const merchantInput = document.createElement('input')
-      merchantInput.type = 'hidden'
-      merchantInput.name = 'MerchantLogin'
-      merchantInput.value = paymentData.merchantId
-      form.appendChild(merchantInput)
-      
-      // OutSum
-      const sumInput = document.createElement('input')
-      sumInput.type = 'hidden'
-      sumInput.name = 'OutSum'
-      sumInput.value = paymentData.sum
-      form.appendChild(sumInput)
-      
-      // InvId
-      const invIdInput = document.createElement('input')
-      invIdInput.type = 'hidden'
-      invIdInput.name = 'InvId'
-      invIdInput.value = paymentData.orderId
-      form.appendChild(invIdInput)
-      
-      // Description
-      const descInput = document.createElement('input')
-      descInput.type = 'hidden'
-      descInput.name = 'Description'
-      descInput.value = paymentData.description
-      form.appendChild(descInput)
-      
-      // SignatureValue
-      const signInput = document.createElement('input')
-      signInput.type = 'hidden'
-      signInput.name = 'SignatureValue'
-      signInput.value = paymentData.signature
-      form.appendChild(signInput)
-      
-      // Email (optional)
-      if (paymentData.customerEmail) {
-        const emailInput = document.createElement('input')
-        emailInput.type = 'hidden'
-        emailInput.name = 'Email'
-        emailInput.value = paymentData.customerEmail
-        form.appendChild(emailInput)
-      }
-      
-      console.log('📤 Отправка формы на Robokassa:', {
-        MerchantLogin: paymentData.merchantId,
-        OutSum: paymentData.sum,
-        InvId: paymentData.orderId,
-        SignatureValue: paymentData.signature
+      // Инициируем платеж через T-Bank
+      const response = await fetch('/api/tbank/initiate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          amount: totalPrice, // В рублях, backend конвертирует в копейки
+          description,
+          data: { 
+            customerEmail: formData.email,
+            customerPhone: formData.phone,
+            connection_type: 'Widget'
+          }
+        }),
       })
-      
-      document.body.appendChild(form)
-      form.submit()
+
+      if (!response.ok) {
+        throw new Error('Ошибка при инициировании платежа')
+      }
+
+      const paymentData = await response.json()
+      console.log('T-Bank payment init response:', paymentData)
+
+      if (paymentData.PaymentURL) {
+        // Редирект на страницу оплаты T-Bank
+        window.location.href = paymentData.PaymentURL
+      } else {
+        throw new Error('Не получен URL для оплаты')
+      }
     } catch (err) {
       console.error('Ошибка оформления заказа:', err)
       setError(err.message || 'Ошибка при оформлении заказа')

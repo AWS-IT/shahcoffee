@@ -31,7 +31,7 @@ dotenv.config();
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use(express.urlencoded({ extended: true })); // Для form-data от Robokassa
+app.use(express.urlencoded({ extended: true }));
 
 const JWT_SECRET = process.env.JWT_SECRET || 'shahcoffee-secret-key-2026';
 
@@ -205,16 +205,7 @@ app.all('/api_ms/{*path}', async (req, res) => {
   }
 });
 
-// Robokassa
-const ROBOKASSA_MERCHANT_ID = process.env.ROBOKASSA_MERCHANT_ID;
-const ROBOKASSA_PASS1 = process.env.ROBOKASSA_PASS1;
-const ROBOKASSA_PASS2 = process.env.ROBOKASSA_PASS2;
-
-if (!ROBOKASSA_MERCHANT_ID || !ROBOKASSA_PASS1 || !ROBOKASSA_PASS2) {
-  console.error('ОШИБКА! Проверь .env файл для Robokassa');
-}
-
-// --- T-Bank (тестовые и боевые) конфигурация ---
+// --- T-Bank Касса конфигурация ---
 const TBANK_TERMINAL = process.env.TBANK_TERMINAL; // Например: 1769767428862DEMO
 const TBANK_PASSWORD = process.env.TBANK_PASSWORD; // Пароль для формирования Token
 const TBANK_INIT_URL = process.env.TBANK_INIT_URL || ''; // Опционально: URL API инициации платежа от Т-Банка
@@ -533,145 +524,6 @@ ${itemsList}
 // Временное хранилище заказов (в production лучше использовать Redis или БД)
 const pendingOrders = new Map();
 
-// Генерация подписи MD5 для инициализации платежа
-function generateSignature(merchantId, sum, orderId, pass) {
-  // Robokassa: сумма как строка, формат X или X.XX
-  const sumStr = String(sum);
-  const signatureString = `${merchantId}:${sumStr}:${orderId}:${pass}`;
-  console.log('Signature generation string:', signatureString);
-  const hash = crypto.createHash('md5').update(signatureString).digest('hex');
-  console.log('Generated hash:', hash);
-  return hash;
-}
-
-// Генерация подписи MD5 для проверки Result callback (формула ДРУГАЯ!)
-function generateResultSignature(sum, orderId, pass) {
-  // Формула: MD5(OutSum:InvId:Password2) - БЕЗ MerchantLogin!
-  const sumStr = String(sum);
-  const signatureString = `${sumStr}:${orderId}:${pass}`;
-  console.log('Result signature string:', signatureString);
-  const hash = crypto.createHash('md5').update(signatureString).digest('hex');
-  console.log('Generated result hash:', hash);
-  return hash;
-}
-
-// Инициирование платежа
-app.post('/api/robokassa/init-payment', (req, res) => {
-  const { orderId, amount, description, customerEmail, customerData, items } = req.body;
-
-  if (!orderId || !amount || !description) {
-    return res.status(400).json({ error: 'Отсутствуют обязательные данные' });
-  }
-
-  // Robokassa: сумма с копейками, минимум 1 рубль
-  const sumNum = parseFloat(amount);
-  if (sumNum < 1) {
-    return res.status(400).json({ error: 'Минимальная сумма заказа 1 рубль' });
-  }
-  // Формат суммы: целое или с двумя знаками
-  const sum = Number.isInteger(sumNum) ? String(sumNum) : sumNum.toFixed(2);
-  const signature = generateSignature(ROBOKASSA_MERCHANT_ID, sum, orderId, ROBOKASSA_PASS1);
-
-  // Сохраняем данные заказа для последующего создания отгрузки
-  if (customerData && items) {
-    pendingOrders.set(orderId, {
-      customerData,
-      items,
-      totalPrice: sum,
-      createdAt: new Date(),
-    });
-    console.log(`✓ Заказ ${orderId} сохранен, ожидает оплаты`);
-  }
-
-  console.log('=== Robokassa Init Payment ===');
-  console.log('OrderId:', orderId);
-  console.log('Amount (input):', amount);
-  console.log('Sum (formatted):', sum);
-  console.log('Signature:', signature);
-
-  res.json({
-    merchantId: ROBOKASSA_MERCHANT_ID,
-    orderId,
-    sum: sum,
-    description,
-    signature,
-    customerEmail: customerEmail || '',
-  });
-});
-
-// Обработка уведомления от Robokassa
-async function handleRobokassaResult(req, res) {
-  const data = req.method === 'POST' ? req.body : req.query;
-  
-  console.log('\n=== Robokassa Result Callback ===');
-  console.log('Method:', req.method);
-  console.log('Raw data:', data);
-  
-  if (!data || !data.InvId) {
-    console.error('❌ Нет данных от Robokassa');
-    return res.status(400).send('Bad request');
-  }
-  
-  // Robokassa использует InvId, не OrderId
-  const OrderId = data.InvId;
-  const Sum = data.OutSum;
-  const SignatureValue = data.SignatureValue;
-
-  console.log('OrderId (InvId):', OrderId);
-  console.log('Sum (OutSum):', Sum);
-  console.log('SignatureValue:', SignatureValue);
-
-  // Robokassa присылает сумму как "1.150000" - используем КАК ЕСТЬ для подписи
-  const expectedSignature = generateResultSignature(Sum, OrderId, ROBOKASSA_PASS2);
-
-  console.log('Expected Signature:', expectedSignature);
-  console.log('Received Signature:', SignatureValue);
-  console.log('Match:', expectedSignature.toLowerCase() === SignatureValue.toLowerCase());
-
-  if (SignatureValue.toLowerCase() !== expectedSignature.toLowerCase()) {
-    console.error('❌ Ошибка подписи Robokassa!');
-    return res.status(403).send('Signature mismatch');
-  }
-
-  console.log(`✓ Платеж подтвержден. Заказ: ${OrderId}, Сумма: ${Sum}`);
-  
-  // Обновляем статус заказа в БД
-  try {
-    await updateOrderStatus(OrderId, 'paid', SignatureValue);
-    console.log(`✓ Статус заказа ${OrderId} обновлен на "paid" в БД`);
-  } catch (dbError) {
-    console.error(`⚠️ Ошибка обновления статуса в БД:`, dbError.message);
-    // Продолжаем - это не критическая ошибка
-  }
-  
-  // Получаем данные заказа из временного хранилища
-  const orderData = pendingOrders.get(OrderId);
-  
-  if (orderData) {
-    // Отправляем уведомление в Telegram
-    const telegramMessage = formatOrderForTelegram(OrderId, orderData, Sum);
-    sendTelegramNotification(telegramMessage);
-    
-    console.log(`📦 Создаем отгрузку в МойСклад для заказа ${OrderId}`);
-    
-    // Создаем отгрузку в МойСклад
-    createMoySkladShipment(OrderId, orderData)
-      .then(() => {
-        console.log(`✓ Отгрузка создана для заказа ${OrderId}`);
-        pendingOrders.delete(OrderId); // Удаляем из временного хранилища
-      })
-      .catch(err => {
-        console.error(`❌ Ошибка создания отгрузки для ${OrderId}:`, err);
-        // Не удаляем из хранилища - можно будет повторить позже
-      });
-  } else {
-    console.warn(`⚠️ Данные заказа ${OrderId} не найдены в хранилище`);
-  }
-  
-  // Robokassa ожидает ответ OK{InvId}
-  res.send(`OK${OrderId}`);
-}
-
 // Функция создания отгрузки в МойСклад
 async function createMoySkladShipment(orderId, orderData) {
   const { customerData, items, totalPrice } = orderData;
@@ -777,7 +629,7 @@ async function createMoySkladShipment(orderId, orderData) {
             linkedSum: totalPrice * 100
           }
         ],
-        paymentPurpose: `Оплата заказа №${orderId} через Robokassa`
+        paymentPurpose: `Оплата заказа №${orderId} через T-Bank`
       };
       
       const paymentResponse = await fetch(`${ADMIN_API_URL}/api/remap/1.2/entity/paymentin`, {
@@ -921,9 +773,6 @@ app.get('/api/products/:id', async (req, res) => {
     res.status(500).json({ error: 'Server error: ' + error.message });
   }
 });
-
-app.post('/api/robokassa/result', handleRobokassaResult);
-app.get('/api/robokassa/result', handleRobokassaResult);
 
 // ========== TELEGRAM AUTH ==========
 

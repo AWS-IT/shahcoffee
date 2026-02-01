@@ -81,19 +81,33 @@ export default function CheckoutPage() {
     setLoading(true);
 
     try {
-      // Генерируем уникальный ID заказа (например: 20250123_1234567890)
-      const orderId = `${Date.now()}_${Math.random().toString().slice(2, 10)}`;
+      // Генерируем уникальный ID заказа
+      const orderId = `order-${Date.now()}`;
       const description = `Заказ кофе на имя ${formData.name}`;
 
-      // Отправляем запрос на сервер для инициирования платежа
-      const response = await fetch('http://localhost:3001/robokassa/init-payment', {
+      // Сохраняем данные заказа в localStorage перед редиректом
+      localStorage.setItem('pendingOrder', JSON.stringify({
+        orderId,
+        customerData: formData,
+        coordinates,
+        items: cart,
+        totalPrice,
+        createdAt: new Date().toISOString(),
+      }));
+
+      // Инициируем платеж через T-Bank
+      const response = await fetch('/api/tbank/initiate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           orderId,
-          amount: totalPrice.toFixed(2),
+          amount: totalPrice,
           description,
-          customerEmail: formData.email,
+          data: {
+            customerEmail: formData.email,
+            customerPhone: formData.phone,
+            connection_type: 'Widget'
+          }
         }),
       });
 
@@ -102,19 +116,14 @@ export default function CheckoutPage() {
       }
 
       const paymentData = await response.json();
+      console.log('T-Bank payment init response:', paymentData);
 
-      // Сохраняем данные заказа в localStorage перед редиректом
-      localStorage.setItem('pendingOrder', JSON.stringify({
-        orderId,
-        customerData: formData,
-        coordinates, // Сохраняем координаты для карты
-        items: cart,
-        totalPrice,
-        createdAt: new Date().toISOString(),
-      }));
-
-      // Перенаправляем пользователя на Robokassa
-      window.location.href = paymentData.redirectUrl;
+      if (paymentData.PaymentURL) {
+        // Перенаправляем на страницу оплаты T-Bank
+        window.location.href = paymentData.PaymentURL;
+      } else {
+        throw new Error('Не получен URL для оплаты');
+      }
     } catch (err) {
       console.error('Ошибка оформления заказа:', err);
       setError(err.message || 'Ошибка при оформлении заказа');

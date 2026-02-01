@@ -13,14 +13,10 @@ export default function PaymentResultPage() {
   const [message, setMessage] = useState('Обработка платежа...');
 
   useEffect(() => {
-    // T-Bank отправляет: orderId (добавлено нами в SuccessURL)
-    // Robokassa отправляет: InvId, OutSum, SignatureValue, Culture
+    // T-Bank: orderId передаётся в SuccessURL как query-параметр
     const orderId = searchParams.get('orderId');
-    const invId = searchParams.get('InvId');
-    const outSum = searchParams.get('OutSum');
-    const signatureValue = searchParams.get('SignatureValue');
 
-    console.log('Payment result params:', { orderId, invId, outSum, signatureValue });
+    console.log('Payment result params:', { orderId });
 
     // Получаем сохраненные данные заказа из localStorage
     const pendingOrder = localStorage.getItem('pendingOrder');
@@ -31,8 +27,7 @@ export default function PaymentResultPage() {
     }
 
     // T-Bank: если есть orderId — платёж успешен (T-Bank перенаправляет на SuccessURL только при успехе)
-    // Robokassa: если есть InvId и SignatureValue — платёж успешен
-    if (orderId || (invId && signatureValue)) {
+    if (orderId) {
       setStatus('success');
       setMessage('Платеж успешно обработан! Перенаправляем на страницу заказа...');
       
