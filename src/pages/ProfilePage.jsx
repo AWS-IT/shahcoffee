@@ -6,7 +6,7 @@ import '../styles/profile.css';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, loading: authLoading } = useAuth();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -16,46 +16,25 @@ export default function ProfilePage() {
   }, [user?.id]);
 
   const loadOrders = async () => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+    
     try {
-      // Загружаем заказы пользователя из БД
-      if (user?.id) {
-        const response = await fetch(`/api/users/${user.id}/orders`);
-        if (response.ok) {
-          const dbOrders = await response.json();
-          setOrders(dbOrders);
-          setLoading(false);
-          return;
-        }
-      }
-      
-      // Fallback: если нет user.id или API недоступен, берём из localStorage
-      const savedOrders = localStorage.getItem('userOrders');
-      if (savedOrders) {
-        const localOrders = JSON.parse(savedOrders);
-        
-        // Проверяем актуальный статус каждого заказа из БД
-        const updatedOrders = await Promise.all(
-          localOrders.map(async (order) => {
-            if (order.orderId) {
-              try {
-                const res = await fetch(`/api/order/${order.orderId}/status`);
-                if (res.ok) {
-                  const data = await res.json();
-                  return { ...order, status: data.status };
-                }
-              } catch (e) {
-                console.error('Ошибка проверки статуса:', e);
-              }
-            }
-            return order;
-          })
-        );
-        
-        setOrders(updatedOrders);
-        localStorage.setItem('userOrders', JSON.stringify(updatedOrders));
+      // Загружаем заказы ТОЛЬКО из БД
+      const response = await fetch(`/api/users/${user.id}/orders`);
+      if (response.ok) {
+        const dbOrders = await response.json();
+        console.log('📦 Загружено заказов из БД:', dbOrders.length, 'для user.id:', user.id);
+        setOrders(dbOrders);
+      } else {
+        console.error('Ошибка загрузки заказов:', response.status);
+        setOrders([]);
       }
     } catch (e) {
       console.error('Ошибка загрузки заказов:', e);
+      setOrders([]);
     } finally {
       setLoading(false);
     }
@@ -98,7 +77,7 @@ export default function ProfilePage() {
     return colors[status] || '#888';
   };
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <section className="profile-page">
         <div className="container">
