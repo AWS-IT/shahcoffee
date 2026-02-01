@@ -251,14 +251,10 @@ app.post('/api/tbank/initiate', async (req, res) => {
     return res.status(400).json({ error: 'Missing orderId or amount' });
   }
 
-  // T-Bank принимает Amount в копейках в примерах — унифицируем: если передали дробное число, умножаем на 100
-  let amountKopecks;
-  if (Number.isInteger(amount)) {
-    amountKopecks = amount; // assume already in kopecks
-  } else {
-    const a = parseFloat(amount);
-    amountKopecks = Math.round(a * 100);
-  }
+  // T-Bank принимает Amount в копейках. Фронтенд передаёт сумму в рублях — всегда умножаем на 100
+  const amountKopecks = Math.round(parseFloat(amount) * 100);
+  
+  console.log(`💰 Сумма: ${amount} руб. → ${amountKopecks} коп.`);
 
 
   // Добавляем orderId к SuccessURL/FailURL как query-параметр
