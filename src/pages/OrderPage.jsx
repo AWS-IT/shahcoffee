@@ -5,20 +5,78 @@ import YandexMap from '../components/YandexMap';
 export default function OrderPage() {
   const navigate = useNavigate();
   const [orderData, setOrderData] = useState(null);
+  const [orderStatus, setOrderStatus] = useState('pending'); // Реальный статус из БД
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Загружаем данные заказа из localStorage
-    const pendingOrder = localStorage.getItem('pendingOrder');
-    if (pendingOrder) {
-      try {
-        setOrderData(JSON.parse(pendingOrder));
-      } catch (e) {
-        console.error('Ошибка загрузки заказа:', e);
+    const loadOrder = async () => {
+      // Загружаем данные заказа из localStorage
+      const pendingOrder = localStorage.getItem('pendingOrder');
+      if (pendingOrder) {
+        try {
+          const order = JSON.parse(pendingOrder);
+          setOrderData(order);
+          
+          // Загружаем реальный статус из БД
+          if (order.orderId) {
+            try {
+              const response = await fetch(`/api/order/${order.orderId}/status`);
+              if (response.ok) {
+                const statusData = await response.json();
+                console.log('Order status from DB:', statusData);
+                setOrderStatus(statusData.status || 'pending');
+              }
+            } catch (e) {
+              console.error('Failed to fetch order status:', e);
+            }
+          }
+        } catch (e) {
+          console.error('Ошибка загрузки заказа:', e);
+        }
       }
-    }
-    setLoading(false);
+      setLoading(false);
+    };
+
+    loadOrder();
   }, []);
+
+  // Helper функции для отображения статуса
+  const getStatusText = (status) => {
+    const statusMap = {
+      'pending': 'Ожидает оплаты',
+      'authorized': 'Авторизован',
+      'confirmed': 'Оплачено',
+      'paid': 'Оплачено',
+      'rejected': 'Отклонён',
+      'canceled': 'Отменён',
+      'refunded': 'Возврат',
+      'failed': 'Ошибка оплаты'
+    };
+    return statusMap[status?.toLowerCase()] || status || 'Неизвестен';
+  };
+
+  const getStatusIcon = (status) => {
+    const iconMap = {
+      'pending': '⏳',
+      'authorized': '🔒',
+      'confirmed': '✅',
+      'paid': '✅',
+      'rejected': '❌',
+      'canceled': '🚫',
+      'refunded': '↩️',
+      'failed': '❌'
+    };
+    return iconMap[status?.toLowerCase()] || '❓';
+  };
+
+  const getStatusClass = (status) => {
+    const successStatuses = ['confirmed', 'paid', 'authorized'];
+    const errorStatuses = ['rejected', 'canceled', 'failed'];
+    
+    if (successStatuses.includes(status?.toLowerCase())) return 'status-success';
+    if (errorStatuses.includes(status?.toLowerCase())) return 'status-error';
+    return 'status-pending';
+  };
 
   if (loading) {
     return (
@@ -94,9 +152,9 @@ export default function OrderPage() {
                 </div>
               </div>
 
-              <div className="order-status">
-                <span className="status-label">✅ Статус</span>
-                <span className="status-badge">Оплачено</span>
+              <div className={`order-status ${getStatusClass(orderStatus)}`}>
+                <span className="status-label">{getStatusIcon(orderStatus)} Статус</span>
+                <span className="status-badge">{getStatusText(orderStatus)}</span>
               </div>
             </div>
 
@@ -242,6 +300,30 @@ export default function OrderPage() {
           background: #008B9D;
           padding: 12px 16px;
           border-radius: 12px;
+        }
+
+        .order-status.status-success {
+          background: #008B9D;
+        }
+
+        .order-status.status-error {
+          background: #dc3545;
+        }
+
+        .order-status.status-pending {
+          background: #ffc107;
+        }
+
+        .order-status.status-pending .status-label {
+          color: #333;
+        }
+
+        .order-status.status-pending .status-badge {
+          color: #856404;
+        }
+
+        .order-status.status-error .status-badge {
+          color: #dc3545;
         }
 
         .status-label {
