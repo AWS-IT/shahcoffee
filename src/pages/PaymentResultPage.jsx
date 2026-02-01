@@ -10,53 +10,131 @@ export default function PaymentResultPage() {
   const { isAuthenticated } = useAuth();
   const [status, setStatus] = useState('processing'); // processing, success, error
   const [orderData, setOrderData] = useState(null);
-  const [message, setMessage] = useState('Обработка платежа...');
+  const [message, setMessage] = useState('Проверяем статус платежа...');
 
   useEffect(() => {
-    // T-Bank: orderId передаётся в SuccessURL как query-параметр
-    const orderId = searchParams.get('orderId');
+    const checkPaymentStatus = async () => {
+      // T-Bank: orderId передаётся в SuccessURL как query-параметр
+      const orderId = searchParams.get('orderId');
 
-    console.log('Payment result params:', { orderId });
+      console.log('Payment result params:', { orderId });
 
-    // Получаем сохраненные данные заказа из localStorage
-    const pendingOrder = localStorage.getItem('pendingOrder');
-    let order = null;
-    if (pendingOrder) {
-      order = JSON.parse(pendingOrder);
-      setOrderData(order);
-    }
-
-    // T-Bank: если есть orderId — платёж успешен (T-Bank перенаправляет на SuccessURL только при успехе)
-    if (orderId) {
-      setStatus('success');
-      setMessage('Платеж успешно обработан! Перенаправляем на страницу заказа...');
-      
-      // Очищаем корзину
-      clearCart();
-      
-      // Обновляем статус заказа
-      if (order) {
-        order.status = 'paid';
-        localStorage.setItem('pendingOrder', JSON.stringify(order));
-        
-        // Сохраняем в историю заказов
-        const savedOrders = localStorage.getItem('userOrders');
-        const orders = savedOrders ? JSON.parse(savedOrders) : [];
-        if (!orders.find(o => o.orderId === order.orderId)) {
-          orders.push(order);
-          localStorage.setItem('userOrders', JSON.stringify(orders));
-        }
+      // Получаем сохраненные данные заказа из localStorage
+      const pendingOrder = localStorage.getItem('pendingOrder');
+      let order = null;
+      if (pendingOrder) {
+        order = JSON.parse(pendingOrder);
+        setOrderData(order);
       }
-      
-      // Перенаправляем на страницу заказа через 1.5 сек
-      setTimeout(() => {
-        navigate('/order');
-      }, 1500);
-    } else {
-      // Если нет параметров - возможно это ошибка или прямой заход
-      setStatus('error');
-      setMessage('Не получены данные платежа. Пожалуйста, свяжитесь с поддержкой.');
-    }
+
+      if (!orderId) {
+        setStatus('error');
+        setMessage('Не получены данные платежа. Пожалуйста, свяжитесь с поддержкой.');
+        return;
+      }
+
+      // ВАЖНО: Проверяем реальный статус платежа на бэкенде
+      try {
+        setMessage('Проверяем статус платежа...');
+        
+        // Сначала проверим статус заказа в нашей БД (обновляется через notification от T-Bank)
+        const orderStatusRes = await fetch(`/api/order/${orderId}/status`);
+        
+        if (orderStatusRes.ok) {
+          const orderStatus = await orderStatusRes.json();
+          console.log('Order status from DB:', orderStatus);
+          
+          // Проверяем статус - должен быть confirmed или paid
+          const confirmedStatuses = ['confirmed', 'paid', 'authorized'];
+          if (confirmedStatuses.includes(orderStatus.status?.toLowerCase())) {
+            // Платёж подтверждён
+            setStatus('success');
+            setMessage('Платеж успешно обработан!');
+            clearCart();
+            
+            if (order) {
+              order.status = 'paid';
+              localStorage.setItem('pendingOrder', JSON.stringify(order));
+              
+              const savedOrders = localStorage.getItem('userOrders');
+              const orders = savedOrders ? JSON.parse(savedOrders) : [];
+              if (!orders.find(o => o.orderId === order.orderId)) {
+                orders.push(order);
+                localStorage.setItem('userOrders', JSON.stringify(orders));
+              }
+            }
+            
+            setTimeout(() => {
+              navigate('/order');
+            }, 2000);
+            return;
+          }
+          
+          // Если статус rejected/canceled/failed
+          const failedStatuses = ['rejected', 'canceled', 'failed', 'refunded'];
+          if (failedStatuses.includes(orderStatus.status?.toLowerCase())) {
+            setStatus('error');
+            setMessage('Платёж не прошёл. Пожалуйста, попробуйте снова.');
+            return;
+          }
+        }
+        
+        // Если статус в БД не подтверждён, ждём немного и проверяем снова
+        // (notification от T-Bank может прийти с задержкой)
+        setMessage('Ожидаем подтверждение от банка...');
+        
+        // Делаем несколько попыток с интервалом
+        for (let attempt = 0; attempt < 5; attempt++) {
+          await new Promise(resolve => setTimeout(resolve, 2000)); // Ждём 2 сек
+          
+          const retryRes = await fetch(`/api/order/${orderId}/status`);
+          if (retryRes.ok) {
+            const retryStatus = await retryRes.json();
+            console.log(`Attempt ${attempt + 1}: Order status:`, retryStatus);
+            
+            if (['confirmed', 'paid', 'authorized'].includes(retryStatus.status?.toLowerCase())) {
+              setStatus('success');
+              setMessage('Платеж успешно обработан!');
+              clearCart();
+              
+              if (order) {
+                order.status = 'paid';
+                localStorage.setItem('pendingOrder', JSON.stringify(order));
+                
+                const savedOrders = localStorage.getItem('userOrders');
+                const orders = savedOrders ? JSON.parse(savedOrders) : [];
+                if (!orders.find(o => o.orderId === order.orderId)) {
+                  orders.push(order);
+                  localStorage.setItem('userOrders', JSON.stringify(orders));
+                }
+              }
+              
+              setTimeout(() => {
+                navigate('/order');
+              }, 2000);
+              return;
+            }
+            
+            if (['rejected', 'canceled', 'failed'].includes(retryStatus.status?.toLowerCase())) {
+              setStatus('error');
+              setMessage('Платёж не прошёл. Пожалуйста, попробуйте снова.');
+              return;
+            }
+          }
+        }
+        
+        // Если после 5 попыток статус не определён — показываем предупреждение
+        setStatus('error');
+        setMessage('Не удалось подтвердить платёж. Если деньги списаны — свяжитесь с поддержкой.');
+        
+      } catch (err) {
+        console.error('Error checking payment status:', err);
+        setStatus('error');
+        setMessage('Ошибка проверки статуса платежа. Свяжитесь с поддержкой.');
+      }
+    };
+
+    checkPaymentStatus();
   }, [searchParams, clearCart, navigate]);
 
   return (

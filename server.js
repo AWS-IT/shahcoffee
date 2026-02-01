@@ -256,6 +256,25 @@ app.post('/api/tbank/initiate', async (req, res) => {
   
   console.log(`💰 Сумма: ${amount} руб. → ${amountKopecks} коп.`);
 
+  // Создаём заказ в БД со статусом 'pending' перед инициацией платежа
+  try {
+    await createOrder({
+      orderId,
+      userId: null,
+      customerName: data?.customerName || 'Клиент',
+      customerPhone: data?.customerPhone || '',
+      customerEmail: data?.customerEmail || '',
+      customerAddress: '',
+      coordinates: null,
+      items: [],
+      totalPrice: amount,
+      status: 'pending'
+    });
+    console.log(`📝 Заказ ${orderId} создан в БД со статусом pending`);
+  } catch (e) {
+    // Заказ может уже существовать — это ОК (повторный вызов initiate)
+    console.warn('Order creation note:', e.message);
+  }
 
   // Добавляем orderId к SuccessURL/FailURL как query-параметр
   function appendOrderIdToUrl(url, orderId) {
@@ -420,6 +439,69 @@ app.post('/api/tbank/simulate', async (req, res) => {
   } catch (e) {
     console.error('simulate notification error', e.message);
     return res.status(500).send(e.message);
+  }
+});
+
+// Endpoint: Проверка статуса платежа через T-Bank API GetState
+app.post('/api/tbank/check-status', async (req, res) => {
+  const { paymentId } = req.body;
+
+  if (!paymentId) {
+    return res.status(400).json({ error: 'Missing paymentId' });
+  }
+
+  const params = {
+    TerminalKey: TBANK_TERMINAL,
+    PaymentId: paymentId,
+  };
+
+  const token = buildTbankToken(params, TBANK_PASSWORD);
+  params.Token = token;
+
+  try {
+    console.log('Checking payment status:', paymentId);
+    const response = await fetch('https://securepay.tinkoff.ru/v2/GetState', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+
+    const data = await response.json();
+    console.log('T-Bank GetState response:', data);
+
+    // Возвращаем статус платежа
+    res.json({
+      success: data.Success,
+      status: data.Status,
+      paymentId: data.PaymentId,
+      orderId: data.OrderId,
+      amount: data.Amount,
+      errorCode: data.ErrorCode,
+      message: data.Message
+    });
+  } catch (err) {
+    console.error('Error checking payment status:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint: Получить статус заказа по orderId (проверяет в БД)
+app.get('/api/order/:orderId/status', async (req, res) => {
+  const { orderId } = req.params;
+  
+  try {
+    const order = await getOrderById(orderId);
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+    res.json({ 
+      orderId: order.order_id,
+      status: order.status,
+      paymentId: order.payment_id
+    });
+  } catch (err) {
+    console.error('Error getting order status:', err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 
