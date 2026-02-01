@@ -36,8 +36,8 @@ function ContactForm() {
             <h3 className="contacts__info-title">Свяжитесь с нами</h3>
             <div className="contacts__info-item">
               <span className="contacts__info-label">Телефон:</span>
-              <a href="tel:+79991234567" className="contacts__info-link">
-                +7 (999) 123-45-67
+              <a href="tel:+79293333388" className="contacts__info-link">
+                +7 (929) 333-33-88
               </a>
             </div>
             <div className="contacts__info-item">
