@@ -285,7 +285,11 @@ app.post('/api/tbank/initiate', async (req, res) => {
   if (TBANK_SUCCESS_URL) params.SuccessURL = appendOrderIdToUrl(TBANK_SUCCESS_URL, orderId);
   if (TBANK_FAIL_URL) params.FailURL = appendOrderIdToUrl(TBANK_FAIL_URL, orderId);
 
-  if (data) params.DATA = data; // will be ignored for token calculation
+  // DATA для виджета — connection_type обязателен для работы СБП/T-Pay кнопок
+  params.DATA = {
+    ...(data || {}),
+    connection_type: 'Widget'
+  };
 
   const token = buildTbankToken(params, TBANK_PASSWORD);
   params.Token = token;
