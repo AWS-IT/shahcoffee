@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useCart } from '../context/CartContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { Link, useNavigate } from 'react-router-dom';
@@ -22,7 +22,6 @@ export default function CheckoutPage() {
   const [error, setError] = useState(null);
   const [formValid, setFormValid] = useState(false);
   const [showPaymentButtons, setShowPaymentButtons] = useState(false);
-  const [paymentIntegration, setPaymentIntegration] = useState(null);
   const [orderData, setOrderData] = useState(null);
   const paymentContainerRef = useRef(null);
   const integrationLoadedRef = useRef(false);
@@ -32,41 +31,6 @@ export default function CheckoutPage() {
     const isValid = formData.name && formData.phone && formData.email && coordinates;
     setFormValid(isValid);
   }, [formData, coordinates]);
-
-  // Функция для получения PaymentURL с бэкенда
-  const getPaymentUrl = useCallback(async () => {
-    if (!orderData) {
-      console.error('No order data available');
-      throw new Error('Данные заказа не готовы');
-    }
-
-    const response = await fetch('/api/tbank/initiate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        orderId: orderData.orderId,
-        amount: totalPrice,
-        description: `Заказ кофе на имя ${formData.name}`,
-        data: {
-          customerEmail: formData.email,
-          customerPhone: formData.phone,
-        }
-      }),
-    });
-
-    if (!response.ok) {
-      throw new Error('Ошибка при инициировании платежа');
-    }
-
-    const paymentData = await response.json();
-    console.log('T-Bank payment init response:', paymentData);
-
-    if (!paymentData.PaymentURL) {
-      throw new Error('Не получен URL для оплаты');
-    }
-
-    return paymentData.PaymentURL;
-  }, [orderData, totalPrice, formData]);
 
   // Загрузка и инициализация T-Bank виджета
   useEffect(() => {
@@ -88,58 +52,62 @@ export default function CheckoutPage() {
         });
       }
 
-      // Инициализируем виджет
+      // Callback для получения PaymentURL
+      const paymentStartCallback = async () => {
+        console.log('paymentStartCallback called, orderData:', orderData);
+        
+        if (!orderData) {
+          throw new Error('Данные заказа не готовы');
+        }
+
+        const response = await fetch('/api/tbank/initiate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: orderData.orderId,
+            amount: totalPrice,
+            description: `Заказ кофе на имя ${formData.name}`,
+            data: {
+              customerEmail: formData.email,
+              customerPhone: formData.phone,
+            }
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Ошибка при инициировании платежа');
+        }
+
+        const paymentData = await response.json();
+        console.log('T-Bank payment init response:', paymentData);
+
+        if (!paymentData.PaymentURL) {
+          throw new Error('Не получен URL для оплаты');
+        }
+
+        return paymentData.PaymentURL;
+      };
+
+      // Инициализируем виджет с callback в конфигурации
       const initConfig = {
         terminalKey: TBANK_TERMINAL_KEY,
         product: 'eacq',
         features: {
-          payment: {}
+          payment: {
+            container: paymentContainerRef.current,
+            paymentStartCallback: paymentStartCallback,
+          }
         }
       };
 
       try {
         const integration = await window.PaymentIntegration.init(initConfig);
-        console.log('T-Bank integration initialized');
-
-        // Создаём платёжную интеграцию
-        const INTEGRATION_NAME = 'checkout-payment';
-        const paymentConfig = {
-          status: {
-            changedCallback: async (status) => {
-              console.log('Payment status changed:', status);
-              if (status === 'SUCCESS') {
-                // Очищаем корзину и редиректим
-                clearCart();
-                navigate(`/payment/success?orderId=${orderData?.orderId}`);
-              } else if (status === 'REJECTED' || status === 'CANCELED') {
-                setError('Платёж отменён или отклонён');
-                setShowPaymentButtons(false);
-              }
-            }
-          },
-          dialog: {
-            closedCallback: async () => {
-              console.log('Payment dialog closed');
-            }
-          }
-        };
-
-        const paymentIntegrationInstance = await integration.payments.create(INTEGRATION_NAME, paymentConfig);
+        console.log('T-Bank integration initialized with payment buttons');
         
-        // Монтируем в контейнер
-        await paymentIntegrationInstance.mount(paymentContainerRef.current);
-        
-        // Устанавливаем доступные методы оплаты (СБП, T-Pay, карты)
-        await paymentIntegrationInstance.updateWidgetTypes(['sbp', 'tpay']);
-        
-        // Устанавливаем callback для получения PaymentURL
-        await paymentIntegrationInstance.setPaymentStartCallback(getPaymentUrl);
-        
-        setPaymentIntegration(paymentIntegrationInstance);
         integrationLoadedRef.current = true;
         setLoading(false);
         
-        console.log('T-Bank payment buttons mounted');
+        console.log('T-Bank payment buttons ready');
       } catch (err) {
         console.error('T-Bank widget init error:', err);
         setError('Ошибка загрузки платёжных кнопок: ' + err.message);
@@ -148,18 +116,7 @@ export default function CheckoutPage() {
     };
 
     loadTBankWidget();
-
-    // Cleanup
-    return () => {
-      if (paymentIntegration) {
-        try {
-          paymentIntegration.destroy?.();
-        } catch (e) {
-          console.log('Widget cleanup error:', e);
-        }
-      }
-    };
-  }, [showPaymentButtons, getPaymentUrl, clearCart, navigate, orderData]);
+  }, [showPaymentButtons, orderData, totalPrice, formData]);
 
   if (cart.length === 0) {
     return (

@@ -1,5 +1,5 @@
 // src/pages/CartPage.jsx
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext.jsx'
 import AddressSuggest from '../components/AddressSuggest.jsx'
@@ -25,47 +25,14 @@ export default function CartPage() {
   const paymentContainerRef = useRef(null)
   const integrationLoadedRef = useRef(false)
 
-  // Функция для получения PaymentURL с бэкенда
-  const getPaymentUrl = useCallback(async () => {
-    if (!orderData) {
-      console.error('No order data available')
-      throw new Error('Данные заказа не готовы')
-    }
-
-    const response = await fetch('/api/tbank/initiate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        orderId: orderData.orderId,
-        amount: totalPrice,
-        description: `Заказ кофе на имя ${formData.name}`,
-        data: {
-          customerEmail: formData.email,
-          customerPhone: formData.phone,
-        }
-      }),
-    })
-
-    if (!response.ok) {
-      throw new Error('Ошибка при инициировании платежа')
-    }
-
-    const paymentData = await response.json()
-    console.log('T-Bank payment init response:', paymentData)
-
-    if (!paymentData.PaymentURL) {
-      throw new Error('Не получен URL для оплаты')
-    }
-
-    return paymentData.PaymentURL
-  }, [orderData, totalPrice, formData])
-
   // Загрузка и инициализация T-Bank виджета
   useEffect(() => {
     if (!showPaymentButtons || !paymentContainerRef.current || integrationLoadedRef.current) {
       return
     }
 
+    // Функция получения PaymentURL должна быть определена внутри useEffect
+    // чтобы использовать актуальные данные orderData
     const loadTBankWidget = async () => {
       // Загружаем скрипт integration.js
       if (!window.PaymentIntegration) {
@@ -80,56 +47,63 @@ export default function CartPage() {
         })
       }
 
-      // Инициализируем виджет
+      // Callback для получения PaymentURL — вызывается при нажатии на кнопку оплаты
+      const paymentStartCallback = async () => {
+        console.log('paymentStartCallback called, orderData:', orderData)
+        
+        if (!orderData) {
+          console.error('No order data available')
+          throw new Error('Данные заказа не готовы')
+        }
+
+        const response = await fetch('/api/tbank/initiate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderId: orderData.orderId,
+            amount: totalPrice,
+            description: `Заказ кофе на имя ${formData.name}`,
+            data: {
+              customerEmail: formData.email,
+              customerPhone: formData.phone,
+            }
+          }),
+        })
+
+        if (!response.ok) {
+          throw new Error('Ошибка при инициировании платежа')
+        }
+
+        const paymentData = await response.json()
+        console.log('T-Bank payment init response:', paymentData)
+
+        if (!paymentData.PaymentURL) {
+          throw new Error('Не получен URL для оплаты')
+        }
+
+        return paymentData.PaymentURL
+      }
+
+      // Инициализируем виджет с paymentStartCallback в конфигурации
       const initConfig = {
         terminalKey: TBANK_TERMINAL_KEY,
         product: 'eacq',
         features: {
-          payment: {}
+          payment: {
+            container: paymentContainerRef.current,
+            paymentStartCallback: paymentStartCallback,
+          }
         }
       }
 
       try {
         const integration = await window.PaymentIntegration.init(initConfig)
-        console.log('T-Bank integration initialized')
-
-        // Создаём платёжную интеграцию
-        const INTEGRATION_NAME = 'cart-payment'
-        const paymentConfig = {
-          status: {
-            changedCallback: async (status) => {
-              console.log('Payment status changed:', status)
-              if (status === 'SUCCESS') {
-                clearCart()
-                navigate(`/payment/success?orderId=${orderData?.orderId}`)
-              } else if (status === 'REJECTED' || status === 'CANCELED') {
-                setError('Платёж отменён или отклонён')
-                setShowPaymentButtons(false)
-              }
-            }
-          },
-          dialog: {
-            closedCallback: async () => {
-              console.log('Payment dialog closed')
-            }
-          }
-        }
-
-        const paymentIntegrationInstance = await integration.payments.create(INTEGRATION_NAME, paymentConfig)
-        
-        // Монтируем в контейнер
-        await paymentIntegrationInstance.mount(paymentContainerRef.current)
-        
-        // Устанавливаем доступные методы оплаты (СБП, T-Pay)
-        await paymentIntegrationInstance.updateWidgetTypes(['sbp', 'tpay'])
-        
-        // Устанавливаем callback для получения PaymentURL
-        await paymentIntegrationInstance.setPaymentStartCallback(getPaymentUrl)
+        console.log('T-Bank integration initialized with payment buttons')
         
         integrationLoadedRef.current = true
         setLoading(false)
         
-        console.log('T-Bank payment buttons mounted')
+        console.log('T-Bank payment buttons ready')
       } catch (err) {
         console.error('T-Bank widget init error:', err)
         setError('Ошибка загрузки платёжных кнопок: ' + err.message)
@@ -138,7 +112,7 @@ export default function CartPage() {
     }
 
     loadTBankWidget()
-  }, [showPaymentButtons, getPaymentUrl, clearCart, navigate, orderData])
+  }, [showPaymentButtons, orderData, totalPrice, formData, clearCart, navigate])
 
   const handleAddressChange = (address) => {
     setFormData({ ...formData, address })
