@@ -82,7 +82,7 @@ export async function initDatabase() {
         coordinates_lon DECIMAL(11, 8),
         items JSON,
         total_price DECIMAL(10, 2),
-        status ENUM('pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled') DEFAULT 'pending',
+        status VARCHAR(50) DEFAULT 'pending',
         payment_id VARCHAR(255),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
