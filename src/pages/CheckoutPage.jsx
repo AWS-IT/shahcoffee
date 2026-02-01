@@ -243,6 +243,7 @@ export default function CheckoutPage() {
       // Показываем кнопки оплаты
       setShowPaymentButtons(true);
       integrationLoadedRef.current = false; // Сбрасываем для перезагрузки виджета
+      setLoading(false);
       
     } catch (err) {
       console.error('Ошибка оформления заказа:', err);

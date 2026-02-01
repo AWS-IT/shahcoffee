@@ -1,13 +1,17 @@
 // src/pages/CartPage.jsx
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext.jsx'
 import AddressSuggest from '../components/AddressSuggest.jsx'
+
+// Ключ терминала T-Bank
+const TBANK_TERMINAL_KEY = '1769767428904';
 
 export default function CartPage() {
   const { cart, updateQuantity, removeFromCart, clearCart, totalPrice } = useCart()
   const navigate = useNavigate()
   const [showCheckout, setShowCheckout] = useState(false)
+  const [showPaymentButtons, setShowPaymentButtons] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -17,6 +21,124 @@ export default function CartPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [coordinates, setCoordinates] = useState(null)
+  const [orderData, setOrderData] = useState(null)
+  const paymentContainerRef = useRef(null)
+  const integrationLoadedRef = useRef(false)
+
+  // Функция для получения PaymentURL с бэкенда
+  const getPaymentUrl = useCallback(async () => {
+    if (!orderData) {
+      console.error('No order data available')
+      throw new Error('Данные заказа не готовы')
+    }
+
+    const response = await fetch('/api/tbank/initiate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orderId: orderData.orderId,
+        amount: totalPrice,
+        description: `Заказ кофе на имя ${formData.name}`,
+        data: {
+          customerEmail: formData.email,
+          customerPhone: formData.phone,
+        }
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error('Ошибка при инициировании платежа')
+    }
+
+    const paymentData = await response.json()
+    console.log('T-Bank payment init response:', paymentData)
+
+    if (!paymentData.PaymentURL) {
+      throw new Error('Не получен URL для оплаты')
+    }
+
+    return paymentData.PaymentURL
+  }, [orderData, totalPrice, formData])
+
+  // Загрузка и инициализация T-Bank виджета
+  useEffect(() => {
+    if (!showPaymentButtons || !paymentContainerRef.current || integrationLoadedRef.current) {
+      return
+    }
+
+    const loadTBankWidget = async () => {
+      // Загружаем скрипт integration.js
+      if (!window.PaymentIntegration) {
+        const script = document.createElement('script')
+        script.src = 'https://integrationjs.tbank.ru/integration.js'
+        script.async = true
+        
+        await new Promise((resolve, reject) => {
+          script.onload = resolve
+          script.onerror = reject
+          document.body.appendChild(script)
+        })
+      }
+
+      // Инициализируем виджет
+      const initConfig = {
+        terminalKey: TBANK_TERMINAL_KEY,
+        product: 'eacq',
+        features: {
+          payment: {}
+        }
+      }
+
+      try {
+        const integration = await window.PaymentIntegration.init(initConfig)
+        console.log('T-Bank integration initialized')
+
+        // Создаём платёжную интеграцию
+        const INTEGRATION_NAME = 'cart-payment'
+        const paymentConfig = {
+          status: {
+            changedCallback: async (status) => {
+              console.log('Payment status changed:', status)
+              if (status === 'SUCCESS') {
+                clearCart()
+                navigate(`/payment/success?orderId=${orderData?.orderId}`)
+              } else if (status === 'REJECTED' || status === 'CANCELED') {
+                setError('Платёж отменён или отклонён')
+                setShowPaymentButtons(false)
+              }
+            }
+          },
+          dialog: {
+            closedCallback: async () => {
+              console.log('Payment dialog closed')
+            }
+          }
+        }
+
+        const paymentIntegrationInstance = await integration.payments.create(INTEGRATION_NAME, paymentConfig)
+        
+        // Монтируем в контейнер
+        await paymentIntegrationInstance.mount(paymentContainerRef.current)
+        
+        // Устанавливаем доступные методы оплаты (СБП, T-Pay)
+        await paymentIntegrationInstance.updateWidgetTypes(['sbp', 'tpay'])
+        
+        // Устанавливаем callback для получения PaymentURL
+        await paymentIntegrationInstance.setPaymentStartCallback(getPaymentUrl)
+        
+        integrationLoadedRef.current = true
+        setLoading(false)
+        
+        console.log('T-Bank payment buttons mounted')
+      } catch (err) {
+        console.error('T-Bank widget init error:', err)
+        setError('Ошибка загрузки платёжных кнопок: ' + err.message)
+        setLoading(false)
+      }
+    }
+
+    loadTBankWidget()
+  }, [showPaymentButtons, getPaymentUrl, clearCart, navigate, orderData])
 
   const handleAddressChange = (address) => {
     setFormData({ ...formData, address })
@@ -49,29 +171,50 @@ export default function CartPage() {
     try {
       // Генерируем orderId
       const orderId = `order-${Date.now()}`
-      const description = `Заказ кофе на имя ${formData.name}`
 
-      // Сохраняем данные заказа в localStorage перед оплатой
-      localStorage.setItem('pendingOrder', JSON.stringify({
+      // Сохраняем данные заказа в localStorage и state
+      const orderInfo = {
         orderId,
         customerData: formData,
         coordinates,
         items: cart,
         totalPrice,
-      }))
+        createdAt: new Date().toISOString(),
+      }
+      
+      localStorage.setItem('pendingOrder', JSON.stringify(orderInfo))
+      setOrderData(orderInfo)
+      
+      // Показываем кнопки оплаты
+      setShowPaymentButtons(true)
+      integrationLoadedRef.current = false
+      setLoading(false)
+      
+    } catch (err) {
+      console.error('Ошибка оформления заказа:', err)
+      setError(err.message || 'Ошибка при оформлении заказа')
+      setLoading(false)
+    }
+  }
 
-      // Инициируем платеж через T-Bank
+  // Альтернативная оплата — редирект на стандартную форму T-Bank
+  const handleFallbackPayment = async () => {
+    if (!orderData) return
+    
+    setLoading(true)
+    setError(null)
+    
+    try {
       const response = await fetch('/api/tbank/initiate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          orderId,
-          amount: totalPrice, // В рублях, backend конвертирует в копейки
-          description,
-          data: { 
+          orderId: orderData.orderId,
+          amount: totalPrice,
+          description: `Заказ кофе на имя ${formData.name}`,
+          data: {
             customerEmail: formData.email,
             customerPhone: formData.phone,
-            connection_type: 'Widget'
           }
         }),
       })
@@ -81,18 +224,15 @@ export default function CartPage() {
       }
 
       const paymentData = await response.json()
-      console.log('T-Bank payment init response:', paymentData)
-
+      
       if (paymentData.PaymentURL) {
-        // Редирект на страницу оплаты T-Bank
         window.location.href = paymentData.PaymentURL
       } else {
         throw new Error('Не получен URL для оплаты')
       }
     } catch (err) {
-      console.error('Ошибка оформления заказа:', err)
-      setError(err.message || 'Ошибка при оформлении заказа')
-    } finally {
+      console.error('Ошибка оплаты:', err)
+      setError(err.message)
       setLoading(false)
     }
   }
@@ -117,84 +257,143 @@ export default function CartPage() {
 
           <div className="checkout-layout">
             <div className="checkout-form">
-              <form onSubmit={handleCheckout}>
-                <div className="form-group">
-                  <label htmlFor="name">Ваше имя *</label>
-                  <input
-                    id="name"
-                    type="text"
-                    name="name"
-                    placeholder="Иван Петров"
-                    value={formData.name}
-                    onChange={handleChange}
-                    required
-                    className="form-input"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="phone">Телефон *</label>
-                  <input
-                    id="phone"
-                    type="tel"
-                    name="phone"
-                    placeholder="+7 (999) 123-45-67"
-                    value={formData.phone}
-                    onChange={handleChange}
-                    required
-                    className="form-input"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="email">Email *</label>
-                  <input
-                    id="email"
-                    type="email"
-                    name="email"
-                    placeholder="ivan@example.com"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                    className="form-input"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="address">Адрес доставки *</label>
-                  <AddressSuggest
-                    value={formData.address}
-                    onChange={handleAddressChange}
-                    onSelect={handleAddressSelect}
-                    placeholder="Начните вводить адрес..."
-                  />
-                  {coordinates && (
-                    <p className="address-confirmed">✓ Адрес подтверждён</p>
-                  )}
-                </div>
-
-                {error && (
-                  <div className="error-message">
-                    {error}
+              {!showPaymentButtons ? (
+                <form onSubmit={handleCheckout}>
+                  <div className="form-group">
+                    <label htmlFor="name">Ваше имя *</label>
+                    <input
+                      id="name"
+                      type="text"
+                      name="name"
+                      placeholder="Иван Петров"
+                      value={formData.name}
+                      onChange={handleChange}
+                      required
+                      className="form-input"
+                    />
                   </div>
-                )}
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="btn-primary btn-lg"
-                >
-                  {loading ? 'Обработка...' : 'Перейти к оплате'}
-                </button>
+                  <div className="form-group">
+                    <label htmlFor="phone">Телефон *</label>
+                    <input
+                      id="phone"
+                      type="tel"
+                      name="phone"
+                      placeholder="+7 (999) 123-45-67"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      required
+                      className="form-input"
+                    />
+                  </div>
 
-                <button
-                  type="button"
-                  onClick={() => setShowCheckout(false)}
-                  className="btn-secondary"
-                >
-                  Вернуться в корзину
-                </button>
-              </form>
+                  <div className="form-group">
+                    <label htmlFor="email">Email *</label>
+                    <input
+                      id="email"
+                      type="email"
+                      name="email"
+                      placeholder="ivan@example.com"
+                      value={formData.email}
+                      onChange={handleChange}
+                      required
+                      className="form-input"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="address">Адрес доставки *</label>
+                    <AddressSuggest
+                      value={formData.address}
+                      onChange={handleAddressChange}
+                      onSelect={handleAddressSelect}
+                      placeholder="Начните вводить адрес..."
+                    />
+                    {coordinates && (
+                      <p className="address-confirmed">✓ Адрес подтверждён</p>
+                    )}
+                  </div>
+
+                  {error && (
+                    <div className="error-message">
+                      {error}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="btn-primary btn-lg"
+                  >
+                    {loading ? 'Обработка...' : 'Перейти к оплате'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowCheckout(false)}
+                    className="btn-secondary"
+                  >
+                    Вернуться в корзину
+                  </button>
+                </form>
+              ) : (
+                <div className="payment-section">
+                  <h2>💳 Выберите способ оплаты</h2>
+                  <p className="payment-info">
+                    Заказ #{orderData?.orderId}<br />
+                    Сумма: <strong>{totalPrice.toLocaleString('ru-RU')} ₽</strong>
+                  </p>
+
+                  {error && (
+                    <div className="error-message">
+                      {error}
+                    </div>
+                  )}
+
+                  {loading && (
+                    <div className="loading-spinner">
+                      <p>Загрузка способов оплаты...</p>
+                    </div>
+                  )}
+
+                  {/* Контейнер для кнопок T-Bank (СБП, T-Pay) */}
+                  <div 
+                    ref={paymentContainerRef} 
+                    id="tbank-payment-container"
+                    className="tbank-payment-buttons"
+                    style={{ minHeight: '60px', marginBottom: '20px' }}
+                  />
+
+                  {/* Альтернативная кнопка — оплата картой на странице T-Bank */}
+                  <div className="payment-alternative">
+                    <p className="payment-divider">или</p>
+                    <button
+                      type="button"
+                      onClick={handleFallbackPayment}
+                      disabled={loading}
+                      className="btn-secondary btn-lg"
+                    >
+                      💳 Оплатить картой
+                    </button>
+                    <p className="payment-hint">
+                      Перейти на защищённую страницу T-Bank
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPaymentButtons(false)
+                      setOrderData(null)
+                      integrationLoadedRef.current = false
+                    }}
+                    className="btn-link"
+                    style={{ marginTop: '20px' }}
+                  >
+                    ← Изменить данные заказа
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="checkout-summary">
