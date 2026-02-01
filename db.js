@@ -347,7 +347,15 @@ export async function getOrderById(orderId) {
     [orderId]
   );
   if (rows[0]) {
-    rows[0].items = JSON.parse(rows[0].items || '[]');
+    let items = [];
+    try {
+      if (rows[0].items && rows[0].items.trim()) {
+        items = JSON.parse(rows[0].items);
+      }
+    } catch (e) {
+      console.warn('Failed to parse items for order', orderId, e.message);
+    }
+    rows[0].items = items;
   }
   return rows[0] || null;
 }
@@ -358,10 +366,17 @@ export async function getOrdersByUserId(userId) {
     'SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC',
     [userId]
   );
-  return rows.map(row => ({
-    ...row,
-    items: JSON.parse(row.items || '[]')
-  }));
+  return rows.map(row => {
+    let items = [];
+    try {
+      if (row.items && row.items.trim()) {
+        items = JSON.parse(row.items);
+      }
+    } catch (e) {
+      console.warn('Failed to parse items for order', row.order_id, e.message);
+    }
+    return { ...row, items };
+  });
 }
 
 // Получить все заказы (для админки)
@@ -370,10 +385,17 @@ export async function getAllOrders(limit = 100, offset = 0) {
     'SELECT * FROM orders ORDER BY created_at DESC LIMIT ? OFFSET ?',
     [limit, offset]
   );
-  return rows.map(row => ({
-    ...row,
-    items: JSON.parse(row.items || '[]')
-  }));
+  return rows.map(row => {
+    let items = [];
+    try {
+      if (row.items && row.items.trim()) {
+        items = JSON.parse(row.items);
+      }
+    } catch (e) {
+      console.warn('Failed to parse items for order', row.order_id, e.message);
+    }
+    return { ...row, items };
+  });
 }
 
 // ==================== МЕТКИ НА КАРТЕ ====================
