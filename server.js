@@ -508,6 +508,34 @@ app.get('/api/order/:orderId/status', async (req, res) => {
   }
 });
 
+// Endpoint: Получить все заказы пользователя по user_id
+app.get('/api/orders/user/:userId', async (req, res) => {
+  const { userId } = req.params;
+  
+  try {
+    const [orders] = await db.query(
+      `SELECT order_id as orderId, status, total_price as totalPrice, items, 
+              customer_name as customerName, customer_address as customerAddress,
+              created_at as createdAt, updated_at as updatedAt
+       FROM orders 
+       WHERE user_id = ? 
+       ORDER BY created_at DESC`,
+      [userId]
+    );
+    
+    // Парсим items из JSON строки
+    const parsedOrders = orders.map(order => ({
+      ...order,
+      items: typeof order.items === 'string' ? JSON.parse(order.items) : order.items
+    }));
+    
+    res.json(parsedOrders);
+  } catch (err) {
+    console.error('Error getting user orders:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Endpoint: Notification handler для T-Bank (обрабатывает POST уведомления)
 app.post(TBANK_NOTIFICATION_URL, async (req, res) => {
   const payload = req.body || {};

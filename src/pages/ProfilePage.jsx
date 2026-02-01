@@ -11,32 +11,48 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Загружаем заказы пользователя из localStorage (в production - из БД)
+    // Загружаем заказы пользователя из БД
     loadOrders();
-  }, []);
+  }, [user?.id]);
 
-  const loadOrders = () => {
+  const loadOrders = async () => {
     try {
-      // Пока берём из localStorage, в production - запрос к API
-      const savedOrders = localStorage.getItem('userOrders');
-      if (savedOrders) {
-        setOrders(JSON.parse(savedOrders));
+      // Загружаем заказы пользователя из БД
+      if (user?.id) {
+        const response = await fetch(`/api/orders/user/${user.id}`);
+        if (response.ok) {
+          const dbOrders = await response.json();
+          setOrders(dbOrders);
+          setLoading(false);
+          return;
+        }
       }
       
-      // Также проверяем pendingOrder
-      const pendingOrder = localStorage.getItem('pendingOrder');
-      if (pendingOrder) {
-        const order = JSON.parse(pendingOrder);
-        // Добавляем как последний заказ если его еще нет
-        setOrders(prev => {
-          const exists = prev.find(o => o.orderId === order.orderId);
-          if (!exists && order.orderId) {
-            const newOrders = [...prev, { ...order, status: 'paid', createdAt: new Date().toISOString() }];
-            localStorage.setItem('userOrders', JSON.stringify(newOrders));
-            return newOrders;
-          }
-          return prev;
-        });
+      // Fallback: если нет user.id или API недоступен, берём из localStorage
+      const savedOrders = localStorage.getItem('userOrders');
+      if (savedOrders) {
+        const localOrders = JSON.parse(savedOrders);
+        
+        // Проверяем актуальный статус каждого заказа из БД
+        const updatedOrders = await Promise.all(
+          localOrders.map(async (order) => {
+            if (order.orderId) {
+              try {
+                const res = await fetch(`/api/order/${order.orderId}/status`);
+                if (res.ok) {
+                  const data = await res.json();
+                  return { ...order, status: data.status };
+                }
+              } catch (e) {
+                console.error('Ошибка проверки статуса:', e);
+              }
+            }
+            return order;
+          })
+        );
+        
+        setOrders(updatedOrders);
+        localStorage.setItem('userOrders', JSON.stringify(updatedOrders));
       }
     } catch (e) {
       console.error('Ошибка загрузки заказов:', e);
@@ -54,10 +70,14 @@ export default function ProfilePage() {
     const statuses = {
       pending: 'Ожидает оплаты',
       paid: 'Оплачено',
+      confirmed: 'Оплачено',
+      CONFIRMED: 'Оплачено',
       processing: 'Готовится',
       shipped: 'В пути',
       delivered: 'Доставлено',
       cancelled: 'Отменено',
+      REJECTED: 'Отклонено',
+      REFUNDED: 'Возврат',
     };
     return statuses[status] || status;
   };
@@ -66,10 +86,14 @@ export default function ProfilePage() {
     const colors = {
       pending: '#ffa500',
       paid: '#008B9D',
+      confirmed: '#008B9D',
+      CONFIRMED: '#008B9D',
       processing: '#9b59b6',
       shipped: '#3498db',
       delivered: '#27ae60',
       cancelled: '#e74c3c',
+      REJECTED: '#e74c3c',
+      REFUNDED: '#9b59b6',
     };
     return colors[status] || '#888';
   };
