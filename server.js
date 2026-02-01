@@ -269,17 +269,35 @@ app.post('/api/tbank/initiate', async (req, res) => {
     amountKopecks = Math.round(a * 100);
   }
 
+
+  // Добавляем orderId к SuccessURL/FailURL как query-параметр
+  function appendOrderIdToUrl(url, orderId) {
+    if (!url) return '';
+    try {
+      const u = new URL(url, 'http://dummy'); // base for relative URLs
+      u.searchParams.set('orderId', orderId);
+      // Если исходный url относительный, возвращаем относительный путь
+      if (!/^https?:\/\//i.test(url)) {
+        return u.pathname + u.search + u.hash;
+      }
+      return u.toString();
+    } catch (e) {
+      // fallback: просто добавить ? или &
+      return url + (url.includes('?') ? '&' : '?') + 'orderId=' + encodeURIComponent(orderId);
+    }
+  }
+
   const params = {
     TerminalKey: TBANK_TERMINAL,
     Amount: amountKopecks,
     OrderId: orderId,
     Description: description || 'Оплата заказа',
   };
-  
-  // Добавляем URLs для success/fail если они настроены
-  if (TBANK_SUCCESS_URL) params.SuccessURL = TBANK_SUCCESS_URL;
-  if (TBANK_FAIL_URL) params.FailURL = TBANK_FAIL_URL;
-  
+
+  // Добавляем URLs для success/fail если они настроены, с orderId
+  if (TBANK_SUCCESS_URL) params.SuccessURL = appendOrderIdToUrl(TBANK_SUCCESS_URL, orderId);
+  if (TBANK_FAIL_URL) params.FailURL = appendOrderIdToUrl(TBANK_FAIL_URL, orderId);
+
   if (data) params.DATA = data; // will be ignored for token calculation
 
   const token = buildTbankToken(params, TBANK_PASSWORD);
