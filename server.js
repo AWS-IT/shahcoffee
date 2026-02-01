@@ -303,6 +303,9 @@ app.post('/api/tbank/initiate', async (req, res) => {
   // Добавляем URLs для success/fail если они настроены, с orderId
   if (TBANK_SUCCESS_URL) params.SuccessURL = appendOrderIdToUrl(TBANK_SUCCESS_URL, orderId);
   if (TBANK_FAIL_URL) params.FailURL = appendOrderIdToUrl(TBANK_FAIL_URL, orderId);
+  
+  // NotificationURL — куда T-Bank будет слать уведомления о статусе платежа
+  params.NotificationURL = 'https://shahshop.ru/api/tbank/notification';
 
   // DATA для виджета — connection_type обязателен для работы СБП/T-Pay кнопок
   params.DATA = {
