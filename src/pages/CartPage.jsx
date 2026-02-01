@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext.jsx'
+import { useAuth } from '../context/AuthContext.jsx'
 import AddressSuggest from '../components/AddressSuggest.jsx'
 
 // Ключ терминала T-Bank
@@ -9,6 +10,7 @@ const TBANK_TERMINAL_KEY = '1769767428904';
 
 export default function CartPage() {
   const { cart, updateQuantity, removeFromCart, clearCart, totalPrice } = useCart()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const [showCheckout, setShowCheckout] = useState(false)
   const [showPaymentButtons, setShowPaymentButtons] = useState(false)
@@ -63,9 +65,11 @@ export default function CartPage() {
             orderId: orderData.orderId,
             amount: totalPrice,
             description: `Заказ кофе на имя ${formData.name}`,
+            userId: user?.id || null,
             data: {
               customerEmail: formData.email,
               customerPhone: formData.phone,
+              customerName: formData.name,
             }
           }),
         })
@@ -186,9 +190,11 @@ export default function CartPage() {
           orderId: orderData.orderId,
           amount: totalPrice,
           description: `Заказ кофе на имя ${formData.name}`,
+          userId: user?.id || null,
           data: {
             customerEmail: formData.email,
             customerPhone: formData.phone,
+            customerName: formData.name,
           }
         }),
       })

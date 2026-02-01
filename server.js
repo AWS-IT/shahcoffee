@@ -245,7 +245,7 @@ function buildTbankToken(params, password) {
 
 // Endpoint: Инициировать платёж через T-Bank (backend должен вызывать метод Initiate и вернуть PaymentURL)
 app.post('/api/tbank/initiate', async (req, res) => {
-  const { orderId, amount, description, data } = req.body;
+  const { orderId, amount, description, data, userId } = req.body;
 
   if (!orderId || !amount) {
     return res.status(400).json({ error: 'Missing orderId or amount' });
@@ -255,12 +255,13 @@ app.post('/api/tbank/initiate', async (req, res) => {
   const amountKopecks = Math.round(parseFloat(amount) * 100);
   
   console.log(`💰 Сумма: ${amount} руб. → ${amountKopecks} коп.`);
+  console.log(`👤 User ID: ${userId || 'не указан'}`);
 
   // Создаём заказ в БД со статусом 'pending' перед инициацией платежа
   try {
     await createOrder({
       orderId,
-      userId: null,
+      userId: userId || null,
       customerName: data?.customerName || 'Клиент',
       customerPhone: data?.customerPhone || '',
       customerEmail: data?.customerEmail || '',
@@ -270,7 +271,7 @@ app.post('/api/tbank/initiate', async (req, res) => {
       totalPrice: amount,
       status: 'pending'
     });
-    console.log(`📝 Заказ ${orderId} создан в БД со статусом pending`);
+    console.log(`📝 Заказ ${orderId} создан в БД со статусом pending, userId: ${userId}`);
   } catch (e) {
     // Заказ может уже существовать — это ОК (повторный вызов initiate)
     console.warn('Order creation note:', e.message);
@@ -1076,7 +1077,10 @@ app.get('/api/orders/:orderId', async (req, res) => {
 // Получить заказы пользователя
 app.get('/api/users/:userId/orders', async (req, res) => {
   try {
-    const orders = await getOrdersByUserId(parseInt(req.params.userId));
+    const userId = parseInt(req.params.userId);
+    console.log(`📦 Запрос заказов для userId: ${userId}`);
+    const orders = await getOrdersByUserId(userId);
+    console.log(`📦 Найдено заказов: ${orders.length}`);
     res.json(orders);
   } catch (error) {
     console.error('❌ Ошибка получения заказов:', error);
