@@ -64,7 +64,7 @@ export default function CartPage() {
           body: JSON.stringify({
             orderId: orderData.orderId,
             amount: totalPrice,
-            description: `Заказ кофе на имя ${formData.name}`,
+            description: `Заказ на имя ${formData.name}`,
             userId: user?.id || null,
             data: {
               customerEmail: formData.email,
@@ -189,7 +189,7 @@ export default function CartPage() {
         body: JSON.stringify({
           orderId: orderData.orderId,
           amount: totalPrice,
-          description: `Заказ кофе на имя ${formData.name}`,
+          description: `Заказ на имя ${formData.name}`,
           userId: user?.id || null,
           data: {
             customerEmail: formData.email,

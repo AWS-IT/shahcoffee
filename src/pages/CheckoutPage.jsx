@@ -246,7 +246,7 @@ export default function CheckoutPage() {
         body: JSON.stringify({
           orderId: orderData.orderId,
           amount: totalPrice,
-          description: `Заказ кофе на имя ${formData.name}`,
+          description: `Заказ на имя ${formData.name}`,
           userId: user?.id || null,
           customerData: formData,
           items: cart,
