@@ -107,6 +107,11 @@ export default function OrderPage() {
   }
 
   const coordinates = orderData.coordinates || { lat: 55.7558, lon: 37.6173 };
+  const resolvedAddress =
+    orderData.customerData?.address ||
+    orderData.customerAddress ||
+    orderData.customer_address ||
+    'Адрес не указан';
 
   return (
     <section className="order-page">
@@ -131,7 +136,7 @@ export default function OrderPage() {
 
               <div className="info-section">
                 <h3>📍 Адрес доставки</h3>
-                <p>{orderData.customerData?.address || 'Адрес не указан'}</p>
+                <p>{resolvedAddress}</p>
               </div>
 
               <div className="info-section">
@@ -179,7 +184,7 @@ export default function OrderPage() {
             <div className="map-card">
               <h2>🗺️ Место доставки</h2>
               <YandexMap 
-                address={orderData.customerData?.address}
+                address={resolvedAddress}
                 orderData={orderData}
                 lat={coordinates.lat}
                 lon={coordinates.lon}

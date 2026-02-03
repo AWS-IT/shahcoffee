@@ -75,6 +75,7 @@ export default function CheckoutPage() {
               customerEmail: formData.email,
               customerPhone: formData.phone,
               customerName: formData.name,
+              customerAddress: formData.address,
             }
           }),
         });
@@ -199,6 +200,25 @@ export default function CheckoutPage() {
         createdAt: new Date().toISOString(),
       };
       setOrderData(orderInfo);
+
+      // Сохраняем заказ в БД до оплаты (адрес/состав)
+      const saveRes = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId,
+          userId: user?.id || null,
+          customerData: formData,
+          coordinates,
+          items: cart,
+          totalPrice,
+        })
+      });
+
+      if (!saveRes.ok) {
+        const errBody = await saveRes.json().catch(() => ({}));
+        throw new Error(errBody.error || 'Ошибка сохранения заказа');
+      }
       
       // Показываем кнопки оплаты
       setShowPaymentButtons(true);
@@ -235,6 +255,7 @@ export default function CheckoutPage() {
             customerEmail: formData.email,
             customerPhone: formData.phone,
             customerName: formData.name,
+            customerAddress: formData.address,
           }
         }),
       });
