@@ -247,6 +247,15 @@ function buildTbankToken(params, password) {
 app.post('/api/tbank/initiate', async (req, res) => {
   const { orderId, amount, description, data, userId, customerData, items, coordinates } = req.body;
 
+  console.log('🧾 Initiate payload:', {
+    orderId,
+    userId,
+    amount,
+    address: customerData?.address || data?.customerAddress || data?.address || '',
+    itemsCount: Array.isArray(items) ? items.length : 0,
+    hasCoords: !!coordinates
+  });
+
   if (!orderId || !amount) {
     return res.status(400).json({ error: 'Missing orderId or amount' });
   }
@@ -1021,6 +1030,15 @@ app.get('/auth/telegram', async (req, res) => {
 app.post('/api/orders', async (req, res) => {
   try {
     const { orderId, userId, customerData, coordinates, items, totalPrice } = req.body;
+
+    console.log('🧾 Create order payload:', {
+      orderId,
+      userId,
+      address: customerData?.address || '',
+      itemsCount: Array.isArray(items) ? items.length : 0,
+      hasCoords: !!coordinates,
+      totalPrice
+    });
     
     const order = await createOrder({
       orderId,
