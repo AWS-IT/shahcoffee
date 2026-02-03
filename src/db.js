@@ -309,9 +309,14 @@ export async function createOrder(orderData) {
     status = 'pending'
   } = orderData;
 
+  const normalizedCustomerName = customerName?.trim() ? customerName.trim() : null;
+  const normalizedCustomerPhone = customerPhone?.trim() ? customerPhone.trim() : null;
+  const normalizedCustomerEmail = customerEmail?.trim() ? customerEmail.trim() : null;
+  const normalizedCustomerAddress = customerAddress?.trim() ? customerAddress.trim() : null;
+
   const itemsJson = Array.isArray(items)
-    ? JSON.stringify(items)
-    : (typeof items === 'string' ? items : null);
+    ? (items.length > 0 ? JSON.stringify(items) : null)
+    : (typeof items === 'string' && items.trim() && items.trim() !== '[]' ? items : null);
 
   const coordinatesLat = coordinates?.lat ?? null;
   const coordinatesLon = coordinates?.lon ?? null;
@@ -334,10 +339,10 @@ export async function createOrder(orderData) {
     [
       orderId,
       userId ?? null,
-      customerName ?? null,
-      customerPhone ?? null,
-      customerEmail ?? null,
-      customerAddress ?? null,
+      normalizedCustomerName,
+      normalizedCustomerPhone,
+      normalizedCustomerEmail,
+      normalizedCustomerAddress,
       coordinatesLat,
       coordinatesLon,
       itemsJson,

@@ -258,10 +258,12 @@ app.post('/api/tbank/initiate', async (req, res) => {
   console.log(`👤 User ID: ${userId || 'не указан'}`);
   console.log(`📦 Items: ${items?.length || 0} шт.`);
 
-  const safeCustomerName = customerData?.name ?? data?.customerName ?? null;
-  const safeCustomerPhone = customerData?.phone ?? data?.customerPhone ?? null;
-  const safeCustomerEmail = customerData?.email ?? data?.customerEmail ?? null;
-  const safeCustomerAddress = customerData?.address ?? data?.customerAddress ?? data?.address ?? null;
+  const safeCustomerName = customerData?.name?.trim() ? customerData.name.trim() : (data?.customerName?.trim() ? data.customerName.trim() : null);
+  const safeCustomerPhone = customerData?.phone?.trim() ? customerData.phone.trim() : (data?.customerPhone?.trim() ? data.customerPhone.trim() : null);
+  const safeCustomerEmail = customerData?.email?.trim() ? customerData.email.trim() : (data?.customerEmail?.trim() ? data.customerEmail.trim() : null);
+  const safeCustomerAddress = customerData?.address?.trim()
+    ? customerData.address.trim()
+    : (data?.customerAddress?.trim() ? data.customerAddress.trim() : (data?.address?.trim() ? data.address.trim() : null));
   const safeItems = Array.isArray(items) && items.length > 0 ? items : null;
   const safeCoordinates = coordinates || null;
 
