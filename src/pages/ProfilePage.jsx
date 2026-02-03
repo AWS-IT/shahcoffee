@@ -168,6 +168,25 @@ export default function ProfilePage() {
                     </div>
 
                     <div className="order-body">
+                      {/* Адрес доставки */}
+                      {order.customerData?.address && (
+                        <div className="order-address">
+                          📍 {order.customerData.address}
+                        </div>
+                      )}
+
+                      <div className="order-meta">
+                        <span className="order-price">
+                          {Number(order.totalPrice || 0).toLocaleString('ru-RU')} ₽
+                        </span>
+                        {order.createdAt && (
+                          <span className="order-date">
+                            {new Date(order.createdAt).toLocaleDateString('ru-RU')}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Состав заказа внизу */}
                       <div className="order-items-preview">
                         {(order.items || []).slice(0, 3).map((item, i) => (
                           <span key={i} className="order-item-name">
@@ -177,17 +196,6 @@ export default function ProfilePage() {
                         {(order.items || []).length > 3 && (
                           <span className="more-items">
                             +{(order.items || []).length - 3} ещё
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="order-meta">
-                        <span className="order-price">
-                          {Number(order.totalPrice || 0).toLocaleString('ru-RU')} ₽
-                        </span>
-                        {order.createdAt && (
-                          <span className="order-date">
-                            {new Date(order.createdAt).toLocaleDateString('ru-RU')}
                           </span>
                         )}
                       </div>
