@@ -349,15 +349,37 @@ export async function getOrderById(orderId) {
   if (rows[0]) {
     let items = [];
     try {
-      if (rows[0].items && rows[0].items.trim()) {
+      if (rows[0].items && typeof rows[0].items === 'string' && rows[0].items.trim()) {
         items = JSON.parse(rows[0].items);
+      } else if (Array.isArray(rows[0].items)) {
+        items = rows[0].items;
       }
     } catch (e) {
       console.warn('Failed to parse items for order', orderId, e.message);
     }
-    rows[0].items = items;
+    // Преобразуем snake_case в camelCase для фронтенда
+    return {
+      orderId: rows[0].order_id,
+      userId: rows[0].user_id,
+      customerData: {
+        name: rows[0].customer_name,
+        phone: rows[0].customer_phone,
+        email: rows[0].customer_email,
+        address: rows[0].customer_address
+      },
+      coordinates: rows[0].coordinates_lat && rows[0].coordinates_lon ? {
+        lat: parseFloat(rows[0].coordinates_lat),
+        lon: parseFloat(rows[0].coordinates_lon)
+      } : null,
+      items,
+      totalPrice: parseFloat(rows[0].total_price) || 0,
+      status: rows[0].status,
+      paymentId: rows[0].payment_id,
+      createdAt: rows[0].created_at,
+      updatedAt: rows[0].updated_at
+    };
   }
-  return rows[0] || null;
+  return null;
 }
 
 // Получить все заказы пользователя
@@ -369,13 +391,35 @@ export async function getOrdersByUserId(userId) {
   return rows.map(row => {
     let items = [];
     try {
-      if (row.items && row.items.trim()) {
+      if (row.items && typeof row.items === 'string' && row.items.trim()) {
         items = JSON.parse(row.items);
+      } else if (Array.isArray(row.items)) {
+        items = row.items;
       }
     } catch (e) {
       console.warn('Failed to parse items for order', row.order_id, e.message);
     }
-    return { ...row, items };
+    // Преобразуем snake_case в camelCase для фронтенда
+    return {
+      orderId: row.order_id,
+      userId: row.user_id,
+      customerData: {
+        name: row.customer_name,
+        phone: row.customer_phone,
+        email: row.customer_email,
+        address: row.customer_address
+      },
+      coordinates: row.coordinates_lat && row.coordinates_lon ? {
+        lat: parseFloat(row.coordinates_lat),
+        lon: parseFloat(row.coordinates_lon)
+      } : null,
+      items,
+      totalPrice: parseFloat(row.total_price) || 0,
+      status: row.status,
+      paymentId: row.payment_id,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
   });
 }
 
@@ -388,13 +432,35 @@ export async function getAllOrders(limit = 100, offset = 0) {
   return rows.map(row => {
     let items = [];
     try {
-      if (row.items && row.items.trim()) {
+      if (row.items && typeof row.items === 'string' && row.items.trim()) {
         items = JSON.parse(row.items);
+      } else if (Array.isArray(row.items)) {
+        items = row.items;
       }
     } catch (e) {
       console.warn('Failed to parse items for order', row.order_id, e.message);
     }
-    return { ...row, items };
+    // Преобразуем snake_case в camelCase для фронтенда
+    return {
+      orderId: row.order_id,
+      userId: row.user_id,
+      customerData: {
+        name: row.customer_name,
+        phone: row.customer_phone,
+        email: row.customer_email,
+        address: row.customer_address
+      },
+      coordinates: row.coordinates_lat && row.coordinates_lon ? {
+        lat: parseFloat(row.coordinates_lat),
+        lon: parseFloat(row.coordinates_lon)
+      } : null,
+      items,
+      totalPrice: parseFloat(row.total_price) || 0,
+      status: row.status,
+      paymentId: row.payment_id,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
+    };
   });
 }
 

@@ -1,77 +1,81 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import YandexMap from '../components/YandexMap';
 
 export default function OrderPage() {
-  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [orderData, setOrderData] = useState(null);
   const [orderStatus, setOrderStatus] = useState('pending'); // Реальный статус из БД
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadOrder = async () => {
-      // Загружаем данные заказа из localStorage
-      const pendingOrder = localStorage.getItem('pendingOrder');
-      if (pendingOrder) {
-        try {
-          const order = JSON.parse(pendingOrder);
-          setOrderData(order);
-          
-          // Загружаем реальный статус из БД
-          if (order.orderId) {
-            try {
-              const response = await fetch(`/api/order/${order.orderId}/status`);
-              if (response.ok) {
-                const statusData = await response.json();
-                console.log('Order status from DB:', statusData);
-                setOrderStatus(statusData.status || 'pending');
-              }
-            } catch (e) {
-              console.error('Failed to fetch order status:', e);
-            }
-          }
-        } catch (e) {
-          console.error('Ошибка загрузки заказа:', e);
-        }
+      const orderId = searchParams.get('id');
+      if (!orderId) {
+        setLoading(false);
+        return;
       }
-      setLoading(false);
+
+      try {
+        const response = await fetch(`/api/orders/${orderId}`);
+        if (response.ok) {
+          const order = await response.json();
+          setOrderData(order);
+          setOrderStatus(order.status || 'pending');
+        } else {
+          setOrderData(null);
+        }
+      } catch (e) {
+        console.error('Ошибка загрузки заказа:', e);
+        setOrderData(null);
+      } finally {
+        setLoading(false);
+      }
     };
 
     loadOrder();
-  }, []);
+  }, [searchParams]);
 
   // Helper функции для отображения статуса
   const getStatusText = (status) => {
     const statusMap = {
-      'pending': 'Ожидает оплаты',
-      'authorized': 'Авторизован',
-      'confirmed': 'Оплачено',
-      'paid': 'Оплачено',
-      'rejected': 'Отклонён',
-      'canceled': 'Отменён',
-      'refunded': 'Возврат',
-      'failed': 'Ошибка оплаты'
+      pending: 'Ожидает оплаты',
+      authorized: 'Авторизован',
+      confirmed: 'Оплачено',
+      paid: 'Оплачено',
+      processing: 'Готовится',
+      shipped: 'В пути',
+      delivered: 'Доставлено',
+      rejected: 'Отклонён',
+      canceled: 'Отменён',
+      cancelled: 'Отменён',
+      refunded: 'Возврат',
+      failed: 'Ошибка оплаты'
     };
     return statusMap[status?.toLowerCase()] || status || 'Неизвестен';
   };
 
   const getStatusIcon = (status) => {
     const iconMap = {
-      'pending': '⏳',
-      'authorized': '🔒',
-      'confirmed': '✅',
-      'paid': '✅',
-      'rejected': '❌',
-      'canceled': '🚫',
-      'refunded': '↩️',
-      'failed': '❌'
+      pending: '⏳',
+      authorized: '🔒',
+      confirmed: '✅',
+      paid: '✅',
+      processing: '🛠️',
+      shipped: '🚚',
+      delivered: '📦',
+      rejected: '❌',
+      canceled: '🚫',
+      cancelled: '🚫',
+      refunded: '↩️',
+      failed: '❌'
     };
     return iconMap[status?.toLowerCase()] || '❓';
   };
 
   const getStatusClass = (status) => {
     const successStatuses = ['confirmed', 'paid', 'authorized'];
-    const errorStatuses = ['rejected', 'canceled', 'failed'];
+    const errorStatuses = ['rejected', 'canceled', 'cancelled', 'failed'];
     
     if (successStatuses.includes(status?.toLowerCase())) return 'status-success';
     if (errorStatuses.includes(status?.toLowerCase())) return 'status-error';
@@ -146,7 +150,9 @@ export default function OrderPage() {
                   {orderData.items?.map((item, idx) => (
                     <div key={idx} className="order-item">
                       <span>{item.name}</span>
-                      <span>{item.quantity} x {item.price?.toLocaleString('ru-RU')} ₽</span>
+                      <span>
+                        {item.quantity} x {(item.priceRub ?? item.price ?? 0).toLocaleString('ru-RU')} ₽
+                      </span>
                     </div>
                   ))}
                 </div>

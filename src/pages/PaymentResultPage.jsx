@@ -1,13 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
-import { useAuth } from '../context/AuthContext';
 
 export default function PaymentResultPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { clearCart } = useCart();
-  const { isAuthenticated } = useAuth();
   const [status, setStatus] = useState('processing'); // processing, success, error
   const [orderData, setOrderData] = useState(null);
   const [message, setMessage] = useState('Проверяем статус платежа...');
@@ -19,18 +17,21 @@ export default function PaymentResultPage() {
 
       console.log('Payment result params:', { orderId });
 
-      // Получаем сохраненные данные заказа из localStorage
-      const pendingOrder = localStorage.getItem('pendingOrder');
-      let order = null;
-      if (pendingOrder) {
-        order = JSON.parse(pendingOrder);
-        setOrderData(order);
-      }
-
       if (!orderId) {
         setStatus('error');
         setMessage('Не получены данные платежа. Пожалуйста, свяжитесь с поддержкой.');
         return;
+      }
+
+      // Загружаем данные заказа из БД
+      try {
+        const orderRes = await fetch(`/api/orders/${orderId}`);
+        if (orderRes.ok) {
+          const order = await orderRes.json();
+          setOrderData(order);
+        }
+      } catch (e) {
+        console.error('Error loading order details:', e);
       }
 
       // ВАЖНО: Проверяем реальный статус платежа на бэкенде
@@ -51,21 +52,9 @@ export default function PaymentResultPage() {
             setStatus('success');
             setMessage('Платеж успешно обработан!');
             clearCart();
-            
-            if (order) {
-              order.status = 'paid';
-              localStorage.setItem('pendingOrder', JSON.stringify(order));
-              
-              const savedOrders = localStorage.getItem('userOrders');
-              const orders = savedOrders ? JSON.parse(savedOrders) : [];
-              if (!orders.find(o => o.orderId === order.orderId)) {
-                orders.push(order);
-                localStorage.setItem('userOrders', JSON.stringify(orders));
-              }
-            }
-            
+
             setTimeout(() => {
-              navigate('/order');
+              navigate(`/order?id=${orderId}`);
             }, 2000);
             return;
           }
@@ -96,21 +85,9 @@ export default function PaymentResultPage() {
               setStatus('success');
               setMessage('Платеж успешно обработан!');
               clearCart();
-              
-              if (order) {
-                order.status = 'paid';
-                localStorage.setItem('pendingOrder', JSON.stringify(order));
-                
-                const savedOrders = localStorage.getItem('userOrders');
-                const orders = savedOrders ? JSON.parse(savedOrders) : [];
-                if (!orders.find(o => o.orderId === order.orderId)) {
-                  orders.push(order);
-                  localStorage.setItem('userOrders', JSON.stringify(orders));
-                }
-              }
-              
+
               setTimeout(() => {
-                navigate('/order');
+                navigate(`/order?id=${orderId}`);
               }, 2000);
               return;
             }
@@ -158,8 +135,8 @@ export default function PaymentResultPage() {
             {orderData && (
               <div className="order-details">
                 <h2>Детали заказа:</h2>
-                <p><strong>Получатель:</strong> {orderData.customerData.name}</p>
-                <p><strong>Сумма заказа:</strong> {orderData.totalPrice.toLocaleString('ru-RU')} ₽</p>
+                <p><strong>Получатель:</strong> {orderData.customerData?.name || 'Не указан'}</p>
+                <p><strong>Сумма заказа:</strong> {(orderData.totalPrice || 0).toLocaleString('ru-RU')} ₽</p>
                 <p><strong>Номер заказа:</strong> {orderData.orderId}</p>
                 <p className="delivery-note">
                   Спасибо за заказ! Мы подготовим ваш заказ и отправим информацию о доставке на указанный email.

@@ -245,7 +245,7 @@ function buildTbankToken(params, password) {
 
 // Endpoint: Инициировать платёж через T-Bank (backend должен вызывать метод Initiate и вернуть PaymentURL)
 app.post('/api/tbank/initiate', async (req, res) => {
-  const { orderId, amount, description, data, userId } = req.body;
+  const { orderId, amount, description, data, userId, customerData, items, coordinates } = req.body;
 
   if (!orderId || !amount) {
     return res.status(400).json({ error: 'Missing orderId or amount' });
@@ -256,22 +256,23 @@ app.post('/api/tbank/initiate', async (req, res) => {
   
   console.log(`💰 Сумма: ${amount} руб. → ${amountKopecks} коп.`);
   console.log(`👤 User ID: ${userId || 'не указан'}`);
+  console.log(`📦 Items: ${items?.length || 0} шт.`);
 
   // Создаём заказ в БД со статусом 'pending' перед инициацией платежа
   try {
     await createOrder({
       orderId,
       userId: userId || null,
-      customerName: data?.customerName || 'Клиент',
-      customerPhone: data?.customerPhone || '',
-      customerEmail: data?.customerEmail || '',
-      customerAddress: '',
-      coordinates: null,
-      items: [],
+      customerName: customerData?.name || data?.customerName || 'Клиент',
+      customerPhone: customerData?.phone || data?.customerPhone || '',
+      customerEmail: customerData?.email || data?.customerEmail || '',
+      customerAddress: customerData?.address || '',
+      coordinates: coordinates || null,
+      items: items || [],
       totalPrice: amount,
       status: 'pending'
     });
-    console.log(`📝 Заказ ${orderId} создан в БД со статусом pending, userId: ${userId}`);
+    console.log(`📝 Заказ ${orderId} создан в БД со статусом pending, userId: ${userId}, items: ${items?.length || 0}`);
   } catch (e) {
     // Заказ может уже существовать — это ОК (повторный вызов initiate)
     console.warn('Order creation note:', e.message);
@@ -499,40 +500,12 @@ app.get('/api/order/:orderId/status', async (req, res) => {
       return res.status(404).json({ error: 'Order not found' });
     }
     res.json({ 
-      orderId: order.order_id,
+      orderId: order.orderId,
       status: order.status,
-      paymentId: order.payment_id
+      paymentId: order.paymentId
     });
   } catch (err) {
     console.error('Error getting order status:', err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// Endpoint: Получить все заказы пользователя по user_id
-app.get('/api/orders/user/:userId', async (req, res) => {
-  const { userId } = req.params;
-  
-  try {
-    const [orders] = await db.query(
-      `SELECT order_id as orderId, status, total_price as totalPrice, items, 
-              customer_name as customerName, customer_address as customerAddress,
-              created_at as createdAt, updated_at as updatedAt
-       FROM orders 
-       WHERE user_id = ? 
-       ORDER BY created_at DESC`,
-      [userId]
-    );
-    
-    // Парсим items из JSON строки
-    const parsedOrders = orders.map(order => ({
-      ...order,
-      items: typeof order.items === 'string' ? JSON.parse(order.items) : order.items
-    }));
-    
-    res.json(parsedOrders);
-  } catch (err) {
-    console.error('Error getting user orders:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

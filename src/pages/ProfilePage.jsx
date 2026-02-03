@@ -48,33 +48,39 @@ export default function ProfilePage() {
   const getStatusText = (status) => {
     const statuses = {
       pending: 'Ожидает оплаты',
+      authorized: 'Авторизован',
       paid: 'Оплачено',
       confirmed: 'Оплачено',
-      CONFIRMED: 'Оплачено',
       processing: 'Готовится',
       shipped: 'В пути',
       delivered: 'Доставлено',
+      canceled: 'Отменено',
       cancelled: 'Отменено',
-      REJECTED: 'Отклонено',
-      REFUNDED: 'Возврат',
+      rejected: 'Отклонено',
+      refunded: 'Возврат',
+      failed: 'Ошибка оплаты',
     };
-    return statuses[status] || status;
+    const key = status?.toLowerCase();
+    return statuses[key] || status || 'Неизвестно';
   };
 
   const getStatusColor = (status) => {
     const colors = {
       pending: '#ffa500',
+      authorized: '#008B9D',
       paid: '#008B9D',
       confirmed: '#008B9D',
-      CONFIRMED: '#008B9D',
       processing: '#9b59b6',
       shipped: '#3498db',
       delivered: '#27ae60',
+      canceled: '#e74c3c',
       cancelled: '#e74c3c',
-      REJECTED: '#e74c3c',
-      REFUNDED: '#9b59b6',
+      rejected: '#e74c3c',
+      refunded: '#9b59b6',
+      failed: '#e74c3c',
     };
-    return colors[status] || '#888';
+    const key = status?.toLowerCase();
+    return colors[key] || '#888';
   };
 
   if (loading || authLoading) {
@@ -163,21 +169,21 @@ export default function ProfilePage() {
 
                     <div className="order-body">
                       <div className="order-items-preview">
-                        {(order.items || order.cartItems)?.slice(0, 3).map((item, i) => (
+                        {(order.items || []).slice(0, 3).map((item, i) => (
                           <span key={i} className="order-item-name">
                             {item.name} × {item.quantity}
                           </span>
                         ))}
-                        {(order.items || order.cartItems)?.length > 3 && (
+                        {(order.items || []).length > 3 && (
                           <span className="more-items">
-                            +{(order.items || order.cartItems).length - 3} ещё
+                            +{(order.items || []).length - 3} ещё
                           </span>
                         )}
                       </div>
 
                       <div className="order-meta">
                         <span className="order-price">
-                          {order.totalPrice?.toLocaleString('ru-RU')} ₽
+                          {Number(order.totalPrice || 0).toLocaleString('ru-RU')} ₽
                         </span>
                         {order.createdAt && (
                           <span className="order-date">
@@ -191,7 +197,6 @@ export default function ProfilePage() {
                       <Link 
                         to={`/order?id=${order.orderId}`} 
                         className="btn-secondary"
-                        onClick={() => localStorage.setItem('pendingOrder', JSON.stringify(order))}
                       >
                         Подробнее
                       </Link>

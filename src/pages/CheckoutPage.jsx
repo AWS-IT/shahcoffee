@@ -66,10 +66,15 @@ export default function CheckoutPage() {
           body: JSON.stringify({
             orderId: orderData.orderId,
             amount: totalPrice,
-            description: `Заказ кофе на имя ${formData.name}`,
+            description: `Заказ на имя ${formData.name}`,
+            userId: user?.id || null,
+            customerData: formData,
+            items: cart,
+            coordinates: coordinates,
             data: {
               customerEmail: formData.email,
               customerPhone: formData.phone,
+              customerName: formData.name,
             }
           }),
         });
@@ -116,7 +121,7 @@ export default function CheckoutPage() {
     };
 
     loadTBankWidget();
-  }, [showPaymentButtons, orderData, totalPrice, formData]);
+  }, [showPaymentButtons, orderData, totalPrice, formData, user, cart, coordinates]);
 
   if (cart.length === 0) {
     return (
@@ -184,7 +189,7 @@ export default function CheckoutPage() {
       // Генерируем уникальный ID заказа
       const orderId = `order-${Date.now()}`;
 
-      // Сохраняем данные заказа в localStorage и state
+      // Сохраняем данные заказа в state
       const orderInfo = {
         orderId,
         customerData: formData,
@@ -193,8 +198,6 @@ export default function CheckoutPage() {
         totalPrice,
         createdAt: new Date().toISOString(),
       };
-      
-      localStorage.setItem('pendingOrder', JSON.stringify(orderInfo));
       setOrderData(orderInfo);
       
       // Показываем кнопки оплаты
@@ -224,9 +227,14 @@ export default function CheckoutPage() {
           orderId: orderData.orderId,
           amount: totalPrice,
           description: `Заказ кофе на имя ${formData.name}`,
+          userId: user?.id || null,
+          customerData: formData,
+          items: cart,
+          coordinates: coordinates,
           data: {
             customerEmail: formData.email,
             customerPhone: formData.phone,
+            customerName: formData.name,
           }
         }),
       });
