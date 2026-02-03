@@ -220,11 +220,25 @@
   font-weight: 600;
 }
 
-.order-body {
+.order-content {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
   margin-bottom: 16px;
+  gap: 20px;
+}
+
+.order-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.order-address {
+  font-size: 14px;
+  color: #2b2620;
+  line-height: 1.4;
 }
 
 .order-items-preview {
