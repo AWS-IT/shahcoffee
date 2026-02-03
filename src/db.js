@@ -309,32 +309,39 @@ export async function createOrder(orderData) {
     status = 'pending'
   } = orderData;
 
+  const itemsJson = Array.isArray(items)
+    ? JSON.stringify(items)
+    : (typeof items === 'string' ? items : null);
+
+  const coordinatesLat = coordinates?.lat ?? null;
+  const coordinatesLon = coordinates?.lon ?? null;
+
   await pool.query(
     `INSERT INTO orders (order_id, user_id, customer_name, customer_phone, customer_email, 
      customer_address, coordinates_lat, coordinates_lon, items, total_price, status)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
-       user_id = VALUES(user_id),
-       customer_name = VALUES(customer_name),
-       customer_phone = VALUES(customer_phone),
-       customer_email = VALUES(customer_email),
-       customer_address = VALUES(customer_address),
-       coordinates_lat = VALUES(coordinates_lat),
-       coordinates_lon = VALUES(coordinates_lon),
-       items = VALUES(items),
-       total_price = VALUES(total_price),
+       user_id = COALESCE(VALUES(user_id), user_id),
+       customer_name = COALESCE(VALUES(customer_name), customer_name),
+       customer_phone = COALESCE(VALUES(customer_phone), customer_phone),
+       customer_email = COALESCE(VALUES(customer_email), customer_email),
+       customer_address = COALESCE(VALUES(customer_address), customer_address),
+       coordinates_lat = COALESCE(VALUES(coordinates_lat), coordinates_lat),
+       coordinates_lon = COALESCE(VALUES(coordinates_lon), coordinates_lon),
+       items = COALESCE(VALUES(items), items),
+       total_price = COALESCE(VALUES(total_price), total_price),
        updated_at = CURRENT_TIMESTAMP`,
     [
       orderId,
-      userId || null,
-      customerName,
-      customerPhone,
-      customerEmail,
-      customerAddress,
-      coordinates?.lat || null,
-      coordinates?.lon || null,
-      JSON.stringify(items),
-      totalPrice,
+      userId ?? null,
+      customerName ?? null,
+      customerPhone ?? null,
+      customerEmail ?? null,
+      customerAddress ?? null,
+      coordinatesLat,
+      coordinatesLon,
+      itemsJson,
+      totalPrice ?? null,
       status
     ]
   );

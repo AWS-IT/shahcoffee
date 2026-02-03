@@ -258,17 +258,24 @@ app.post('/api/tbank/initiate', async (req, res) => {
   console.log(`👤 User ID: ${userId || 'не указан'}`);
   console.log(`📦 Items: ${items?.length || 0} шт.`);
 
+  const safeCustomerName = customerData?.name ?? data?.customerName ?? null;
+  const safeCustomerPhone = customerData?.phone ?? data?.customerPhone ?? null;
+  const safeCustomerEmail = customerData?.email ?? data?.customerEmail ?? null;
+  const safeCustomerAddress = customerData?.address ?? data?.customerAddress ?? data?.address ?? null;
+  const safeItems = Array.isArray(items) && items.length > 0 ? items : null;
+  const safeCoordinates = coordinates || null;
+
   // Создаём заказ в БД со статусом 'pending' перед инициацией платежа
   try {
     await createOrder({
       orderId,
       userId: userId || null,
-      customerName: customerData?.name || data?.customerName || 'Клиент',
-      customerPhone: customerData?.phone || data?.customerPhone || '',
-      customerEmail: customerData?.email || data?.customerEmail || '',
-      customerAddress: customerData?.address || data?.customerAddress || data?.address || '',
-      coordinates: coordinates || null,
-      items: items || [],
+      customerName: safeCustomerName,
+      customerPhone: safeCustomerPhone,
+      customerEmail: safeCustomerEmail,
+      customerAddress: safeCustomerAddress,
+      coordinates: safeCoordinates,
+      items: safeItems,
       totalPrice: amount,
       status: 'pending'
     });
