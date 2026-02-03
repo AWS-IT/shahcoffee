@@ -147,14 +147,21 @@ export default function OrderPage() {
               <div className="info-section">
                 <h3>📋 Состав заказа</h3>
                 <div className="order-items">
-                  {orderData.items?.map((item, idx) => (
-                    <div key={idx} className="order-item">
-                      <span>{item.name}</span>
-                      <span>
-                        {item.quantity} x {(item.priceRub ?? item.price ?? 0).toLocaleString('ru-RU')} ₽
-                      </span>
+                  {orderData.items?.length ? (
+                    orderData.items.map((item, idx) => (
+                      <div key={idx} className="order-item">
+                        <span>{item.name}</span>
+                        <span>
+                          {item.quantity} x {(item.priceRub ?? item.price ?? 0).toLocaleString('ru-RU')} ₽
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="order-item">
+                      <span>Состав заказа не найден</span>
+                      <span>—</span>
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
 
