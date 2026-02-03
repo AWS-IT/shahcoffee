@@ -60,22 +60,23 @@ export default function CheckoutPage() {
           throw new Error('Данные заказа не готовы');
         }
 
+        // Используем данные из orderData, т.к. cart мог измениться
         const response = await fetch('/api/tbank/initiate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             orderId: orderData.orderId,
-            amount: totalPrice,
-            description: `Заказ на имя ${formData.name}`,
+            amount: orderData.totalPrice,
+            description: `Заказ на имя ${orderData.customerData.name}`,
             userId: user?.id || null,
-            customerData: formData,
-            items: cart,
-            coordinates: coordinates,
+            customerData: orderData.customerData,
+            items: orderData.items,
+            coordinates: orderData.coordinates,
             data: {
-              customerEmail: formData.email,
-              customerPhone: formData.phone,
-              customerName: formData.name,
-              customerAddress: formData.address,
+              customerEmail: orderData.customerData.email,
+              customerPhone: orderData.customerData.phone,
+              customerName: orderData.customerData.name,
+              customerAddress: orderData.customerData.address,
             }
           }),
         });
@@ -249,7 +250,7 @@ export default function CheckoutPage() {
       setError('Пожалуйста, выберите адрес из списка подсказок');
       return;
     }
-    if (!cart.length) {
+    if (!orderData.items || !orderData.items.length) {
       setError('Корзина пуста');
       return;
     }
@@ -258,22 +259,23 @@ export default function CheckoutPage() {
     setError(null);
     
     try {
+      // Используем данные из orderData
       const response = await fetch('/api/tbank/initiate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           orderId: orderData.orderId,
-          amount: totalPrice,
-          description: `Заказ на имя ${formData.name}`,
+          amount: orderData.totalPrice,
+          description: `Заказ на имя ${orderData.customerData.name}`,
           userId: user?.id || null,
-          customerData: formData,
-          items: cart,
-          coordinates: coordinates,
+          customerData: orderData.customerData,
+          items: orderData.items,
+          coordinates: orderData.coordinates,
           data: {
-            customerEmail: formData.email,
-            customerPhone: formData.phone,
-            customerName: formData.name,
-            customerAddress: formData.address,
+            customerEmail: orderData.customerData.email,
+            customerPhone: orderData.customerData.phone,
+            customerName: orderData.customerData.name,
+            customerAddress: orderData.customerData.address,
           }
         }),
       });
