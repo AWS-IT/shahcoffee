@@ -247,14 +247,14 @@ function buildTbankToken(params, password) {
 app.post('/api/tbank/initiate', async (req, res) => {
   const { orderId, amount, description, data, userId, customerData, items, coordinates } = req.body;
 
-  console.log('🧾 Initiate payload:', {
-    orderId,
-    userId,
-    amount,
-    address: customerData?.address || data?.customerAddress || data?.address || '',
-    itemsCount: Array.isArray(items) ? items.length : 0,
-    hasCoords: !!coordinates
-  });
+  console.log('========================================');
+  console.log('🧾 ПОЛНЫЙ PAYLOAD /api/tbank/initiate:');
+  console.log(JSON.stringify(req.body, null, 2));
+  console.log('----------------------------------------');
+  console.log('customerData:', JSON.stringify(customerData, null, 2));
+  console.log('items:', JSON.stringify(items, null, 2));
+  console.log('coordinates:', JSON.stringify(coordinates, null, 2));
+  console.log('========================================');
 
   if (!orderId || !amount) {
     return res.status(400).json({ error: 'Missing orderId or amount' });
@@ -1031,14 +1031,14 @@ app.post('/api/orders', async (req, res) => {
   try {
     const { orderId, userId, customerData, coordinates, items, totalPrice } = req.body;
 
-    console.log('🧾 Create order payload:', {
-      orderId,
-      userId,
-      address: customerData?.address || '',
-      itemsCount: Array.isArray(items) ? items.length : 0,
-      hasCoords: !!coordinates,
-      totalPrice
-    });
+    console.log('========================================');
+    console.log('🧾 ПОЛНЫЙ PAYLOAD /api/orders:');
+    console.log(JSON.stringify(req.body, null, 2));
+    console.log('----------------------------------------');
+    console.log('customerData:', JSON.stringify(customerData, null, 2));
+    console.log('items:', JSON.stringify(items, null, 2));
+    console.log('coordinates:', JSON.stringify(coordinates, null, 2));
+    console.log('========================================');
     
     const order = await createOrder({
       orderId,

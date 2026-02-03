@@ -178,6 +178,11 @@ export default function CheckoutPage() {
     e.preventDefault();
     setError(null);
 
+    if (!formData.address || !formData.address.trim()) {
+      setError('Пожалуйста, выберите адрес из списка подсказок');
+      return;
+    }
+
     // Проверяем что адрес выбран из списка (есть координаты)
     if (!coordinates) {
       setError('Пожалуйста, выберите адрес из списка подсказок');
@@ -236,6 +241,19 @@ export default function CheckoutPage() {
   const handleFallbackPayment = async () => {
     if (!orderData) return;
     
+    if (!formData.address || !formData.address.trim()) {
+      setError('Пожалуйста, выберите адрес из списка подсказок');
+      return;
+    }
+    if (!coordinates) {
+      setError('Пожалуйста, выберите адрес из списка подсказок');
+      return;
+    }
+    if (!cart.length) {
+      setError('Корзина пуста');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     
