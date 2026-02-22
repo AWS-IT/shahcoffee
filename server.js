@@ -23,6 +23,11 @@ import {
   createMapMarker,
   updateMapMarker,
   deleteMapMarker,
+  getPickupPoints,
+  getAllPickupPoints,
+  createPickupPoint,
+  updatePickupPoint,
+  deletePickupPoint,
   getSetting,
   setSetting
 } from './db.js';
@@ -60,10 +65,12 @@ app.get('/api/address-search', async (req, res) => {
   }
   
   try {
-    const url = `https://geocode-maps.yandex.ru/1.x/?apikey=${GEOCODER_KEY}&format=json&geocode=${encodeURIComponent(q)}&results=5&lang=ru_RU`;
+    const url = `https://geocode-maps.yandex.ru/v1/?apikey=${GEOCODER_KEY}&format=json&geocode=${encodeURIComponent(q)}&results=5&lang=ru_RU`;
     console.log(`🔍 Поиск адреса (Yandex): ${q}`);
-    
-    const response = await fetch(url);
+
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json', 'Accept-Language': 'ru_RU' },
+    });
 
     if (!response.ok) {
       throw new Error(`Yandex Geocoder error: ${response.status}`);
@@ -110,9 +117,11 @@ app.get('/api/geocode', async (req, res) => {
   }
   
   try {
-    const url = `https://geocode-maps.yandex.ru/1.x/?apikey=${YANDEX_GEOCODER_KEY}&format=json&geocode=${encodeURIComponent(query)}&results=5&lang=ru_RU`;
-    const response = await fetch(url);
-    
+    const url = `https://geocode-maps.yandex.ru/v1/?apikey=${YANDEX_GEOCODER_KEY}&format=json&geocode=${encodeURIComponent(query)}&results=5&lang=ru_RU`;
+    const response = await fetch(url, {
+      headers: { 'Accept': 'application/json', 'Accept-Language': 'ru_RU' },
+    });
+
     if (!response.ok) {
       throw new Error(`Yandex API error: ${response.status}`);
     }
@@ -1430,6 +1439,159 @@ app.delete('/api/admin/markers/:id', requireAdmin, async (req, res) => {
 });
 
 // ========== END MAP MARKERS ==========
+
+// ==================== API ПУНКТЫ ВЫДАЧИ ====================
+
+// Запасной список пунктов выдачи, если нет данных в МойСклад и БД
+const DEFAULT_PICKUP_POINTS = [
+  { id: 'default-1', name: 'Москва, Лосевская 6', address: '129347, Россия, г Москва, ул Лосевская, 6', lat: 55.873637, lon: 37.711949, description: null, working_hours: null, is_active: true },
+  { id: 'default-2', name: 'Урус-Мартан, пер. Чехова 21', address: '366522, Россия, Чеченская Респ, Урус-Мартановский р-н, г Урус-Мартан, пер 1-й Чехова, 21', lat: 43.131677, lon: 45.537147, description: null, working_hours: null, is_active: true },
+  { id: 'default-3', name: 'Грозный, ул. Яндарова 20А', address: '364020, Россия, Чеченская Респ, г Грозный, улица Шейха Абдул-Хамида Солсаевича Яндарова, 20А', lat: 43.323797, lon: 45.694496, description: null, working_hours: null, is_active: true },
+];
+
+function normalizeAddress(s) {
+  return (s || '').trim().toLowerCase().replace(/\s+/g, ' ').replace(/[,.]/g, ' ');
+}
+
+// Схлопывает пункты из МойСклад и дефолтные: при одинаковом адресе оставляем дефолтный (с координатами)
+function mergePickupPoints(msPoints, defaultPoints) {
+  const defaultByKey = new Map();
+  defaultPoints.forEach(d => {
+    const key = normalizeAddress(d.address) || normalizeAddress(d.name);
+    if (key) defaultByKey.set(key, d);
+  });
+  const usedDefaultIds = new Set();
+  const merged = [];
+  for (const ms of msPoints) {
+    const key = normalizeAddress(ms.address) || normalizeAddress(ms.name);
+    const match = key ? defaultByKey.get(key) : null;
+    if (match) {
+      merged.push(match);
+      usedDefaultIds.add(match.id);
+    } else {
+      merged.push(ms);
+    }
+  }
+  defaultPoints.forEach(d => {
+    if (!usedDefaultIds.has(d.id)) merged.push(d);
+  });
+  return merged;
+}
+
+// Пункты выдачи: сначала из МойСклад (склады), при недоступности — из БД, иначе захардкоженный список
+app.get('/api/pickup-points', async (req, res) => {
+  if (PUBLIC_TOKEN) {
+    try {
+      const response = await fetch(`${ADMIN_API_URL}/api/remap/1.2/entity/store`, {
+        headers: { 'Authorization': `Bearer ${PUBLIC_TOKEN}`, 'Content-Type': 'application/json' },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const msPoints = (data.rows || []).map(store => {
+          let address = store.address;
+          if (address && typeof address === 'object') {
+            const parts = [address.city, address.street, address.house, address.apartment].filter(Boolean);
+            address = parts.join(', ') || store.name || '';
+          }
+          return {
+          id: store.id,
+          name: store.name,
+          address: address || store.addressFull || '',
+          lat: null,
+          lon: null,
+          description: null,
+          working_hours: null,
+          is_active: true,
+        };
+        });
+        if (msPoints.length > 0) {
+          const merged = mergePickupPoints(msPoints, DEFAULT_PICKUP_POINTS);
+          console.log(`📦 Пункты выдачи: МойСклад ${msPoints.length} + дефолтные (схлопнуто: ${merged.length})`);
+          return res.json(merged);
+        }
+      }
+    } catch (err) {
+      console.warn('МойСклад недоступен для пунктов выдачи, пробуем БД:', err.message);
+    }
+  }
+  try {
+    const points = await getPickupPoints();
+    if (points.length > 0) return res.json(points);
+  } catch (error) {
+    console.error('❌ Ошибка получения пунктов выдачи:', error.message || error);
+    if (error.code !== 'ECONNREFUSED' && error.code !== 'ECONNRESET' && error.code !== 'ETIMEDOUT') {
+      return res.status(500).json({ error: 'Failed to get pickup points' });
+    }
+  }
+  console.log('📦 Пункты выдачи: запасной список (нет данных в МойСклад/БД)');
+  return res.json(DEFAULT_PICKUP_POINTS);
+});
+
+app.get('/api/admin/pickup-points', requireAdmin, async (req, res) => {
+  try {
+    const points = await getAllPickupPoints();
+    res.json(points);
+  } catch (error) {
+    console.error('❌ Ошибка получения пунктов выдачи:', error);
+    res.status(500).json({ error: 'Failed to get pickup points' });
+  }
+});
+
+app.post('/api/admin/pickup-points', requireAdmin, async (req, res) => {
+  try {
+    const { name, address, lat, lon, description, working_hours, is_active } = req.body;
+    if (!name || lat == null || lon == null) {
+      return res.status(400).json({ error: 'Name, lat and lon are required' });
+    }
+    const point = await createPickupPoint({
+      name,
+      address: address || '',
+      lat,
+      lon,
+      description: description || null,
+      working_hours: working_hours || null,
+      is_active: is_active !== false,
+    });
+    console.log('✓ Пункт выдачи создан:', name);
+    res.json(point);
+  } catch (error) {
+    console.error('❌ Ошибка создания пункта выдачи:', error);
+    res.status(500).json({ error: 'Failed to create pickup point' });
+  }
+});
+
+app.put('/api/admin/pickup-points/:id', requireAdmin, async (req, res) => {
+  try {
+    const { name, address, lat, lon, description, working_hours, is_active } = req.body;
+    const point = await updatePickupPoint(req.params.id, {
+      name,
+      address: address ?? '',
+      lat,
+      lon,
+      description: description ?? null,
+      working_hours: working_hours ?? null,
+      is_active: is_active !== false,
+    });
+    console.log('✓ Пункт выдачи обновлён:', name);
+    res.json(point);
+  } catch (error) {
+    console.error('❌ Ошибка обновления пункта выдачи:', error);
+    res.status(500).json({ error: 'Failed to update pickup point' });
+  }
+});
+
+app.delete('/api/admin/pickup-points/:id', requireAdmin, async (req, res) => {
+  try {
+    await deletePickupPoint(req.params.id);
+    console.log('✓ Пункт выдачи удалён:', req.params.id);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Ошибка удаления пункта выдачи:', error);
+    res.status(500).json({ error: 'Failed to delete pickup point' });
+  }
+});
+
+// ========== END PICKUP POINTS ==========
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

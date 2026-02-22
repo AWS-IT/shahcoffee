@@ -31,6 +31,22 @@ export default function Admin() {
   const [storesLoading, setStoresLoading] = useState(false)
   const [storeSaving, setStoreSaving] = useState(false)
 
+  // Состояние для пунктов выдачи
+  const [pickupPoints, setPickupPoints] = useState([])
+  const [pickupPointsLoading, setPickupPointsLoading] = useState(false)
+  const [showPickupForm, setShowPickupForm] = useState(false)
+  const [editingPickup, setEditingPickup] = useState(null)
+  const [pickupAddressInput, setPickupAddressInput] = useState('')
+  const [pickupForm, setPickupForm] = useState({
+    name: '',
+    address: '',
+    lat: '',
+    lon: '',
+    description: '',
+    working_hours: '',
+    is_active: true
+  })
+
   // Проверка доступа при загрузке
   useEffect(() => {
     const verifyAccess = async () => {
@@ -55,6 +71,7 @@ export default function Admin() {
       loadMarkers()
       loadStores()
       loadSelectedStore()
+      loadPickupPoints()
     }
   }, [hasAccess])
 
@@ -255,6 +272,102 @@ export default function Admin() {
     }
   }
 
+  // ——— Пункты выдачи ———
+  const loadPickupPoints = async () => {
+    setPickupPointsLoading(true)
+    try {
+      const response = await fetch('/api/admin/pickup-points', { headers: getAuthHeaders() })
+      if (response.status === 403) {
+        setHasAccess(false)
+        setAccessError('Доступ запрещён')
+        return
+      }
+      const data = await response.json()
+      if (Array.isArray(data)) setPickupPoints(data)
+    } catch (error) {
+      console.error('Ошибка загрузки пунктов выдачи:', error)
+    } finally {
+      setPickupPointsLoading(false)
+    }
+  }
+
+  const handlePickupAddressSelect = (suggestion) => {
+    setPickupForm(prev => ({
+      ...prev,
+      address: suggestion.address,
+      lat: suggestion.coordinates.lat,
+      lon: suggestion.coordinates.lon
+    }))
+  }
+
+  const resetPickupForm = () => {
+    setPickupForm({
+      name: '',
+      address: '',
+      lat: '',
+      lon: '',
+      description: '',
+      working_hours: '',
+      is_active: true
+    })
+    setPickupAddressInput('')
+    setEditingPickup(null)
+    setShowPickupForm(false)
+  }
+
+  const handlePickupSubmit = async (e) => {
+    e.preventDefault()
+    if (!pickupForm.name || !pickupForm.lat || !pickupForm.lon) {
+      alert('Заполните название и выберите адрес')
+      return
+    }
+    try {
+      const url = editingPickup
+        ? `/api/admin/pickup-points/${editingPickup.id}`
+        : '/api/admin/pickup-points'
+      const response = await fetch(url, {
+        method: editingPickup ? 'PUT' : 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(pickupForm)
+      })
+      if (response.ok) {
+        loadPickupPoints()
+        resetPickupForm()
+      } else {
+        const data = await response.json()
+        alert(data.error || 'Ошибка сохранения пункта выдачи')
+      }
+    } catch (error) {
+      console.error('Ошибка:', error)
+      alert('Ошибка сохранения пункта выдачи')
+    }
+  }
+
+  const handleEditPickup = (point) => {
+    setPickupForm({
+      name: point.name,
+      address: point.address || '',
+      lat: point.lat,
+      lon: point.lon,
+      description: point.description || '',
+      working_hours: point.working_hours || '',
+      is_active: point.is_active
+    })
+    setPickupAddressInput(point.address || '')
+    setEditingPickup(point)
+    setShowPickupForm(true)
+  }
+
+  const handleDeletePickup = async (id) => {
+    if (!confirm('Удалить пункт выдачи?')) return
+    try {
+      await fetch(`/api/admin/pickup-points/${id}`, { method: 'DELETE', headers: getAuthHeaders() })
+      loadPickupPoints()
+    } catch (error) {
+      console.error('Ошибка удаления:', error)
+    }
+  }
+
   return (
     <div className="admin-page">
       <div className="admin-container">
@@ -424,7 +537,138 @@ export default function Admin() {
               )}
             </div>
           </div>
+
+        {/* Секция пунктов выдачи */}
+        <div className="admin-card markers-section">
+          <div className="markers-header">
+            <h2>🏪 Пункты выдачи</h2>
+            <button
+              className="btn-primary"
+              onClick={() => setShowPickupForm(!showPickupForm)}
+            >
+              {showPickupForm ? '✕ Закрыть' : '+ Добавить пункт выдачи'}
+            </button>
+          </div>
+
+          {showPickupForm && (
+            <form onSubmit={handlePickupSubmit} className="marker-form">
+              <h3>{editingPickup ? 'Редактировать пункт выдачи' : 'Новый пункт выдачи'}</h3>
+
+              <div className="form-group">
+                <label>Название *</label>
+                <input
+                  type="text"
+                  value={pickupForm.name}
+                  onChange={(e) => setPickupForm({ ...pickupForm, name: e.target.value })}
+                  placeholder="Название пункта выдачи"
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Описание (необязательно)</label>
+                <textarea
+                  value={pickupForm.description}
+                  onChange={(e) => setPickupForm({ ...pickupForm, description: e.target.value })}
+                  placeholder="Краткое описание"
+                  rows={2}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Адрес (поиск) *</label>
+                <AddressSuggest
+                  value={pickupAddressInput}
+                  onChange={setPickupAddressInput}
+                  onSelect={handlePickupAddressSelect}
+                  placeholder="Начните вводить адрес..."
+                />
+                {pickupForm.address && (
+                  <p className="selected-address">✓ Выбран: {pickupForm.address}</p>
+                )}
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Широта</label>
+                  <input
+                    type="text"
+                    value={pickupForm.lat}
+                    readOnly
+                    placeholder="43.1315"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Долгота</label>
+                  <input
+                    type="text"
+                    value={pickupForm.lon}
+                    readOnly
+                    placeholder="45.5273"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Режим работы (необязательно)</label>
+                <input
+                  type="text"
+                  value={pickupForm.working_hours}
+                  onChange={(e) => setPickupForm({ ...pickupForm, working_hours: e.target.value })}
+                  placeholder="Пн–Пт 9:00–18:00"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Статус</label>
+                <select
+                  value={pickupForm.is_active ? 'true' : 'false'}
+                  onChange={(e) => setPickupForm({ ...pickupForm, is_active: e.target.value === 'true' })}
+                >
+                  <option value="true">✅ Активен</option>
+                  <option value="false">❌ Скрыт</option>
+                </select>
+              </div>
+
+              <div className="form-actions">
+                <button type="submit" className="btn-primary">
+                  {editingPickup ? 'Сохранить' : 'Создать пункт выдачи'}
+                </button>
+                <button type="button" className="btn-secondary" onClick={resetPickupForm}>
+                  Отмена
+                </button>
+              </div>
+            </form>
+          )}
+
+          <div className="markers-list">
+            {pickupPointsLoading ? (
+              <p>Загрузка...</p>
+            ) : pickupPoints.length === 0 ? (
+              <p className="no-markers">Пунктов выдачи пока нет. Добавьте первый!</p>
+            ) : (
+              pickupPoints.map(point => (
+                <div key={point.id} className={`marker-item ${!point.is_active ? 'inactive' : ''}`}>
+                  <div className="marker-info">
+                    <span className="marker-color">🏪</span>
+                    <div>
+                      <strong>{point.name}</strong>
+                      {point.address && <p className="marker-address">{point.address}</p>}
+                      {(point.description || point.working_hours) && (
+                        <p className="marker-desc">{point.description || ''} {point.working_hours || ''}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="marker-actions">
+                    <button onClick={() => handleEditPickup(point)} className="btn-edit">✏️</button>
+                    <button onClick={() => handleDeletePickup(point.id)} className="btn-delete">🗑️</button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
+    </div>
   )
 }
