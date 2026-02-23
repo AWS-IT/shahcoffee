@@ -108,6 +108,23 @@ export async function initDatabase() {
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
+
+    // Таблица пунктов выдачи (для выбора при оформлении заказа)
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS pickup_points (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        address VARCHAR(500),
+        lat DECIMAL(10, 8) NOT NULL,
+        lon DECIMAL(11, 8) NOT NULL,
+        description TEXT,
+        working_hours VARCHAR(255),
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_is_active (is_active)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
     
     connection.release();
     console.log('✓ База данных инициализирована');
@@ -507,6 +524,65 @@ export async function updateMapMarker(id, marker) {
 // Удалить метку
 export async function deleteMapMarker(id) {
   await pool.query('DELETE FROM map_markers WHERE id = ?', [id]);
+}
+
+// ==================== ПУНКТЫ ВЫДАЧИ ====================
+
+export async function getPickupPoints() {
+  const [rows] = await pool.query(
+    'SELECT id, name, address, lat, lon, description, working_hours, is_active FROM pickup_points WHERE is_active = TRUE ORDER BY name'
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    address: row.address,
+    lat: row.lat != null ? parseFloat(row.lat) : null,
+    lon: row.lon != null ? parseFloat(row.lon) : null,
+    description: row.description,
+    working_hours: row.working_hours,
+    is_active: Boolean(row.is_active),
+  }));
+}
+
+export async function getAllPickupPoints() {
+  const [rows] = await pool.query(
+    'SELECT id, name, address, lat, lon, description, working_hours, is_active, created_at, updated_at FROM pickup_points ORDER BY name'
+  );
+  return rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    address: row.address,
+    lat: row.lat != null ? parseFloat(row.lat) : null,
+    lon: row.lon != null ? parseFloat(row.lon) : null,
+    description: row.description,
+    working_hours: row.working_hours,
+    is_active: Boolean(row.is_active),
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  }));
+}
+
+export async function createPickupPoint(pickup) {
+  const { name, address, lat, lon, description, working_hours, is_active } = pickup;
+  const [result] = await pool.query(
+    `INSERT INTO pickup_points (name, address, lat, lon, description, working_hours, is_active)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [name, address || '', lat, lon, description || null, working_hours || null, is_active !== false]
+  );
+  return { id: result.insertId, ...pickup };
+}
+
+export async function updatePickupPoint(id, pickup) {
+  const { name, address, lat, lon, description, working_hours, is_active } = pickup;
+  await pool.query(
+    `UPDATE pickup_points SET name = ?, address = ?, lat = ?, lon = ?, description = ?, working_hours = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [name, address, lat, lon, description || null, working_hours || null, is_active !== false, id]
+  );
+  return { id, ...pickup };
+}
+
+export async function deletePickupPoint(id) {
+  await pool.query('DELETE FROM pickup_points WHERE id = ?', [id]);
 }
 
 export default pool;

@@ -24,6 +24,7 @@ export default function CartPage() {
   const [error, setError] = useState(null)
   const [coordinates, setCoordinates] = useState(null)
   const [orderData, setOrderData] = useState(null)
+  const [pickupPoints, setPickupPoints] = useState([])
   const paymentContainerRef = useRef(null)
   const integrationLoadedRef = useRef(false)
 
@@ -122,6 +123,17 @@ export default function CartPage() {
 
     loadTBankWidget()
   }, [showPaymentButtons, orderData, totalPrice, formData, clearCart, navigate])
+
+  // Загрузка пунктов выдачи при открытии формы оформления заказа
+  useEffect(() => {
+    if (!showCheckout) return
+    let cancelled = false
+    fetch('/api/pickup-points')
+      .then((res) => res.ok ? res.json() : [])
+      .then((data) => { if (!cancelled) setPickupPoints(Array.isArray(data) ? data : []) })
+      .catch(() => { if (!cancelled) setPickupPoints([]) })
+    return () => { cancelled = true }
+  }, [showCheckout])
 
   const handleAddressChange = (address) => {
     setFormData({ ...formData, address })
@@ -297,7 +309,8 @@ export default function CartPage() {
                       value={formData.address}
                       onChange={handleAddressChange}
                       onSelect={handleAddressSelect}
-                      placeholder="Начните вводить адрес..."
+                      placeholder="Начните вводить адрес или выберите пункт выдачи..."
+                      pickupPoints={pickupPoints}
                     />
                     {coordinates && (
                       <p className="address-confirmed">✓ Адрес подтверждён</p>

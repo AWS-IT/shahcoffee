@@ -1,6 +1,10 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 
-export default function AddressSuggest({ value, onChange, onSelect, placeholder = 'Введите адрес доставки' }) {
+function normalizeForMatch(s) {
+  return (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+export default function AddressSuggest({ value, onChange, onSelect, placeholder = 'Введите адрес доставки', pickupPoints = [] }) {
   const [suggestions, setSuggestions] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -9,6 +13,17 @@ export default function AddressSuggest({ value, onChange, onSelect, placeholder 
   const inputRef = useRef(null);
   const suggestRef = useRef(null);
   const debounceRef = useRef(null);
+
+  // Пункты выдачи, подходящие по введённому адресу (фильтр по name и address)
+  const filteredPickupPoints = useMemo(() => {
+    const query = normalizeForMatch(value);
+    if (!query || query.length < 2) return pickupPoints;
+    return pickupPoints.filter((point) => {
+      const name = normalizeForMatch(point.name);
+      const address = normalizeForMatch(point.address);
+      return name.includes(query) || address.includes(query);
+    });
+  }, [pickupPoints, value]);
 
   // Поиск адресов через Nominatim (OpenStreetMap) - бесплатно и без ключа
   const searchAddress = useCallback(async (query) => {
@@ -73,22 +88,73 @@ export default function AddressSuggest({ value, onChange, onSelect, placeholder 
     return match ? match[1] : null;
   };
 
-  // Выбор адреса из списка
+  // Выбор адреса из списка (подсказка или пункт выдачи)
   const handleSelectAddress = (suggestion) => {
-    // Попробуем добавить номер дома, если он был в запросе но не в результате
+    // Пункт выдачи уже приходит с address и coordinates
+    if (suggestion.source === 'pickup') {
+      onChange(suggestion.address);
+      onSelect && onSelect({ address: suggestion.address, coordinates: suggestion.coordinates, source: 'pickup', id: suggestion.id });
+      setIsOpen(false);
+      setSuggestions([]);
+      setShowManualInput(false);
+      return;
+    }
+    // Подсказка по адресу: попробуем добавить номер дома, если он был в запросе
     const houseNumber = extractHouseNumber(value);
     let finalAddress = suggestion.address;
-    
-    // Если в текущем вводе есть номер дома, а в выбранном адресе нет - добавим
     if (houseNumber && !suggestion.address.match(/\d+[а-яА-Яa-zA-Z]?(?:\/\d+)?/)) {
       finalAddress = `${suggestion.name} ${houseNumber}, ${suggestion.description}`;
     }
-    
     onChange(finalAddress);
     onSelect && onSelect({ ...suggestion, address: finalAddress });
     setIsOpen(false);
     setSuggestions([]);
     setShowManualInput(false);
+  };
+
+  // Запасные координаты для пунктов выдачи default-* (если с сервера пришли без координат)
+  const DEFAULT_POINT_COORDS = {
+    'default-1': { lat: 43.131677, lon: 45.537147 },
+    'default-2': { lat: 55.873637, lon: 37.711949 },
+    'default-3': { lat: 43.323797, lon: 45.694496 },
+  };
+
+  // Выбор пункта выдачи из списка (если нет координат — геокодер или запас для default-*)
+  const handleSelectPickupPoint = async (point) => {
+    let lat = point.lat;
+    let lon = point.lon;
+    const address = point.address || point.name;
+    if (lat == null || lon == null) {
+      const fallback = point.id && DEFAULT_POINT_COORDS[point.id];
+      if (fallback) {
+        lat = fallback.lat;
+        lon = fallback.lon;
+      } else if (address) {
+        try {
+          const res = await fetch(`/api/geocode?query=${encodeURIComponent(address)}`);
+          if (res.ok) {
+            const data = await res.json();
+            const first = data.results && data.results[0];
+            if (first?.coordinates) {
+              lat = first.coordinates.lat;
+              lon = first.coordinates.lon;
+            }
+          }
+        } catch (e) {
+          console.warn('Геокодер для пункта выдачи:', e);
+        }
+      }
+      if (lat == null || lon == null) {
+        alert('Не удалось определить координаты для этого пункта. Введите адрес вручную или выберите другой пункт.');
+        return;
+      }
+    }
+    handleSelectAddress({
+      address: address || point.name,
+      coordinates: { lat, lon },
+      source: 'pickup',
+      id: point.id,
+    });
   };
 
   // Применить координаты вручную
@@ -147,7 +213,10 @@ export default function AddressSuggest({ value, onChange, onSelect, placeholder 
           type="text"
           value={value}
           onChange={handleInputChange}
-          onFocus={() => suggestions.length > 0 && setIsOpen(true)}
+          onFocus={() => {
+            if (suggestions.length > 0) setIsOpen(true);
+            if (filteredPickupPoints?.length > 0) setIsOpen(true);
+          }}
           placeholder={placeholder}
           className="address-input"
           autoComplete="off"
@@ -155,23 +224,52 @@ export default function AddressSuggest({ value, onChange, onSelect, placeholder 
         {isLoading && <span className="address-loading">🔍</span>}
       </div>
 
-      {isOpen && suggestions.length > 0 && (
+      {isOpen && (suggestions.length > 0 || (filteredPickupPoints?.length > 0)) && (
         <ul ref={suggestRef} className="address-suggestions">
-          {suggestions.map((suggestion, index) => (
-            <li
-              key={index}
-              className="address-suggestion-item"
-              onClick={() => handleSelectAddress(suggestion)}
-            >
-              <span className="suggestion-icon">📍</span>
-              <div className="suggestion-content">
-                <span className="suggestion-name">{suggestion.name}</span>
-                {suggestion.description && (
-                  <span className="suggestion-description">{suggestion.description}</span>
-                )}
-              </div>
-            </li>
-          ))}
+          {filteredPickupPoints?.length > 0 && (
+            <>
+              <li className="address-suggest-section-label">Пункты выдачи</li>
+              {filteredPickupPoints.map((point) => (
+                <li
+                  key={point.id}
+                  className="address-suggestion-item address-suggestion-pickup"
+                  onClick={() => handleSelectPickupPoint(point)}
+                >
+                  <span className="suggestion-icon">🏪</span>
+                  <div className="suggestion-content">
+                    <span className="suggestion-name">{point.name}</span>
+                    {(point.address || point.working_hours) && (
+                      <span className="suggestion-description">
+                        {point.address}
+                        {point.address && point.working_hours ? ' · ' : ''}
+                        {point.working_hours}
+                      </span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </>
+          )}
+          {suggestions.length > 0 && (
+            <>
+              {filteredPickupPoints?.length > 0 && <li className="address-suggest-section-label">Подсказки по адресу</li>}
+              {suggestions.map((suggestion, index) => (
+                <li
+                  key={index}
+                  className="address-suggestion-item"
+                  onClick={() => handleSelectAddress(suggestion)}
+                >
+                  <span className="suggestion-icon">📍</span>
+                  <div className="suggestion-content">
+                    <span className="suggestion-name">{suggestion.name}</span>
+                    {suggestion.description && (
+                      <span className="suggestion-description">{suggestion.description}</span>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </>
+          )}
         </ul>
       )}
 
@@ -286,6 +384,21 @@ export default function AddressSuggest({ value, onChange, onSelect, placeholder 
 
         .address-suggestion-item:hover {
           background: #f6f1e9;
+        }
+
+        .address-suggest-section-label {
+          padding: 8px 16px 4px;
+          font-size: 11px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          color: #8a7b6a;
+          cursor: default;
+          list-style: none;
+        }
+
+        .address-suggestion-pickup .suggestion-icon {
+          font-size: 16px;
         }
 
         .suggestion-icon {
