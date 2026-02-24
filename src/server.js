@@ -1469,13 +1469,6 @@ app.delete('/api/admin/markers/:id', requireAdmin, async (req, res) => {
 
 // ==================== API ПУНКТЫ ВЫДАЧИ ====================
 
-// Запасной список пунктов выдачи, если нет данных в МойСклад и БД
-const DEFAULT_PICKUP_POINTS = [
-  { id: 'default-1', name: 'Москва, Лосевская 6', address: '129347, Россия, г Москва, ул Лосевская, 6', lat: 55.873637, lon: 37.711949, description: null, working_hours: null, is_active: true },
-  { id: 'default-2', name: 'Урус-Мартан, пер. Чехова 21', address: '366522, Россия, Чеченская Респ, Урус-Мартановский р-н, г Урус-Мартан, пер 1-й Чехова, 21', lat: 43.131677, lon: 45.537147, description: null, working_hours: null, is_active: true },
-  { id: 'default-3', name: 'Грозный, ул. Яндарова 20А', address: '364020, Россия, Чеченская Респ, г Грозный, улица Шейха Абдул-Хамида Солсаевича Яндарова, 20А', lat: 43.323797, lon: 45.694496, description: null, working_hours: null, is_active: true },
-];
-
 function normalizeAddress(s) {
   return (s || '').trim().toLowerCase().replace(/\s+/g, ' ').replace(/[,.]/g, ' ');
 }
@@ -1513,7 +1506,9 @@ app.get('/api/pickup-points', async (req, res) => {
       });
       if (response.ok) {
         const data = await response.json();
-        const msPoints = (data.rows || []).map(store => {
+        // Используем только те склады, которые помечены кодом "1" как пункты выдачи
+        const pickupStores = (data.rows || []).filter(store => String(store.code || '').trim() === '1');
+        const msPoints = pickupStores.map(store => {
           let address = store.address;
           if (address && typeof address === 'object') {
             const parts = [address.city, address.street, address.house, address.apartment].filter(Boolean);
