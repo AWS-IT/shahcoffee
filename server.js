@@ -528,11 +528,19 @@ app.post(TBANK_NOTIFICATION_URL, async (req, res) => {
   console.log('Raw body type:', typeof req.body);
 
   const receivedToken = payload.Token;
-  
-  // Обновляем статус заказа даже если Token не пришёл (временно для отладки)
   const orderId = payload.OrderId;
   const status = payload.Status;
-  
+
+  // До обновления статуса проверяем, был ли заказ в pending (чтобы создать отгрузку только один раз)
+  let orderBeforeUpdate = null;
+  if (orderId) {
+    try {
+      orderBeforeUpdate = await getOrderById(orderId);
+    } catch (e) {
+      console.warn('Failed to get order before update:', e.message);
+    }
+  }
+
   if (orderId && status) {
     try {
       await updateOrderStatus(orderId, String(status).toLowerCase());
@@ -542,21 +550,42 @@ app.post(TBANK_NOTIFICATION_URL, async (req, res) => {
     }
   }
 
+  // При успешной оплате (CONFIRMED) создаём отгрузку в МойСклад и шлём уведомление в Telegram
+  const isConfirmed = String(status).toUpperCase() === 'CONFIRMED';
+  const wasPending = orderBeforeUpdate && orderBeforeUpdate.status === 'pending';
+  if (isConfirmed && wasPending && orderId) {
+    try {
+      const order = await getOrderById(orderId);
+      if (order && order.items && order.items.length > 0) {
+        try {
+          await createMoySkladShipment(orderId, order);
+          console.log(`📦 Отгрузка по заказу ${orderId} создана в МойСклад`);
+        } catch (shipErr) {
+          console.error('❌ Ошибка создания отгрузки в МойСклад:', shipErr.message);
+        }
+        try {
+          const message = formatOrderForTelegram(orderId, order, order.totalPrice);
+          await sendTelegramNotification(message);
+        } catch (tgErr) {
+          console.warn('Telegram уведомление не отправлено:', tgErr.message);
+        }
+      }
+    } catch (e) {
+      console.error('❌ Ошибка при обработке оплаченного заказа:', e.message);
+    }
+  }
+
   // Проверка токена (если есть)
   if (!receivedToken) {
     console.warn('⚠️ T-Bank notification missing Token - but order updated');
-    // Всё равно возвращаем OK чтобы T-Bank не повторял запросы
     return res.status(200).send('OK');
   }
 
-  // Recompute token from root-level fields (excluding Token) and compare
   const copy = { ...payload };
   delete copy.Token;
-
   const expected = buildTbankToken(copy, TBANK_PASSWORD);
   if (expected !== receivedToken) {
     console.error('T-Bank notification token mismatch', { expected, receivedToken });
-    // Всё равно возвращаем OK — заказ уже обновлён
     return res.status(200).send('OK');
   }
 
@@ -601,9 +630,10 @@ async function sendTelegramNotification(message) {
 function formatOrderForTelegram(orderId, orderData, sum) {
   const { customerData, items } = orderData;
   
-  const itemsList = items?.map(item => 
-    `  • ${item.name} × ${item.quantity} = ${(item.price * item.quantity).toLocaleString('ru-RU')} ₽`
-  ).join('\n') || 'Нет товаров';
+  const itemsList = items?.map(item => {
+    const price = item.priceRub ?? item.price ?? 0;
+    return `  • ${item.name} × ${item.quantity} = ${(price * item.quantity).toLocaleString('ru-RU')} ₽`;
+  }).join('\n') || 'Нет товаров';
   
   return `🎉 <b>НОВЫЙ ЗАКАЗ!</b>
 
@@ -1442,43 +1472,8 @@ app.delete('/api/admin/markers/:id', requireAdmin, async (req, res) => {
 
 // ==================== API ПУНКТЫ ВЫДАЧИ ====================
 
-// Запасной список пунктов выдачи, если нет данных в МойСклад и БД
-const DEFAULT_PICKUP_POINTS = [
-  { id: 'default-1', name: 'Москва, Лосевская 6', address: '129347, Россия, г Москва, ул Лосевская, 6', lat: 55.873637, lon: 37.711949, description: null, working_hours: null, is_active: true },
-  { id: 'default-2', name: 'Урус-Мартан, пер. Чехова 21', address: '366522, Россия, Чеченская Респ, Урус-Мартановский р-н, г Урус-Мартан, пер 1-й Чехова, 21', lat: 43.131677, lon: 45.537147, description: null, working_hours: null, is_active: true },
-  { id: 'default-3', name: 'Грозный, ул. Яндарова 20А', address: '364020, Россия, Чеченская Респ, г Грозный, улица Шейха Абдул-Хамида Солсаевича Яндарова, 20А', lat: 43.323797, lon: 45.694496, description: null, working_hours: null, is_active: true },
-];
 
-function normalizeAddress(s) {
-  return (s || '').trim().toLowerCase().replace(/\s+/g, ' ').replace(/[,.]/g, ' ');
-}
-
-// Схлопывает пункты из МойСклад и дефолтные: при одинаковом адресе оставляем дефолтный (с координатами)
-function mergePickupPoints(msPoints, defaultPoints) {
-  const defaultByKey = new Map();
-  defaultPoints.forEach(d => {
-    const key = normalizeAddress(d.address) || normalizeAddress(d.name);
-    if (key) defaultByKey.set(key, d);
-  });
-  const usedDefaultIds = new Set();
-  const merged = [];
-  for (const ms of msPoints) {
-    const key = normalizeAddress(ms.address) || normalizeAddress(ms.name);
-    const match = key ? defaultByKey.get(key) : null;
-    if (match) {
-      merged.push(match);
-      usedDefaultIds.add(match.id);
-    } else {
-      merged.push(ms);
-    }
-  }
-  defaultPoints.forEach(d => {
-    if (!usedDefaultIds.has(d.id)) merged.push(d);
-  });
-  return merged;
-}
-
-// Пункты выдачи: сначала из МойСклад (склады), при недоступности — из БД, иначе захардкоженный список
+// Пункты выдачи: сначала из МойСклад (склады с code = 1), при недоступности — из БД
 app.get('/api/pickup-points', async (req, res) => {
   if (PUBLIC_TOKEN) {
     try {
@@ -1487,7 +1482,9 @@ app.get('/api/pickup-points', async (req, res) => {
       });
       if (response.ok) {
         const data = await response.json();
-        const msPoints = (data.rows || []).map(store => {
+        // Используем только те склады, которые помечены кодом "1" как пункты выдачи
+        const pickupStores = (data.rows || []).filter(store => String(store.code || '').trim() === '1');
+        const msPoints = pickupStores.map(store => {
           let address = store.address;
           if (address && typeof address === 'object') {
             const parts = [address.city, address.street, address.house, address.apartment].filter(Boolean);
@@ -1505,9 +1502,8 @@ app.get('/api/pickup-points', async (req, res) => {
         };
         });
         if (msPoints.length > 0) {
-          const merged = mergePickupPoints(msPoints, DEFAULT_PICKUP_POINTS);
-          console.log(`📦 Пункты выдачи: МойСклад ${msPoints.length} + дефолтные (схлопнуто: ${merged.length})`);
-          return res.json(merged);
+          console.log(`📦 Пункты выдачи: МойСклад (code=1) ${msPoints.length}`);
+          return res.json(msPoints);
         }
       }
     } catch (err) {
