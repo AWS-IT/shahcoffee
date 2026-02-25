@@ -14,6 +14,7 @@ export default function CartPage() {
   const navigate = useNavigate()
   const [showCheckout, setShowCheckout] = useState(false)
   const [showPaymentButtons, setShowPaymentButtons] = useState(false)
+  const [showOtherMethods, setShowOtherMethods] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -341,7 +342,7 @@ export default function CartPage() {
                 </form>
               ) : (
                 <div className="payment-section">
-                  <h2>💳 Выберите способ оплаты</h2>
+                  <h2>Оплата заказа</h2>
                   <p className="payment-info">
                     Заказ #{orderData?.orderId}<br />
                     Сумма: <strong>{totalPrice.toLocaleString('ru-RU')} ₽</strong>
@@ -359,28 +360,57 @@ export default function CartPage() {
                     </div>
                   )}
 
-                  {/* Контейнер для кнопок T-Bank (СБП, T-Pay) */}
-                  <div 
-                    ref={paymentContainerRef} 
-                    id="tbank-payment-container"
-                    className="tbank-payment-buttons"
-                    style={{ minHeight: '60px', marginBottom: '20px' }}
-                  />
+                  {/* Основной блок — СБП (приоритетный способ) */}
+                  <div className="sbp-primary-block">
+                    <div className="sbp-badge">Быстро и без комиссии</div>
+                    <div className="sbp-icon-row">
+                      <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="40" height="40" rx="10" fill="#fff"/>
+                        <path d="M20 6L12 10.5V19.5L20 24L28 19.5V10.5L20 6Z" fill="#5B2D8E"/>
+                        <path d="M20 24L12 19.5V28.5L20 33L28 28.5V19.5L20 24Z" fill="#F26F23"/>
+                        <path d="M12 10.5L20 15L28 10.5" stroke="#1FA8F1" strokeWidth="1.5"/>
+                        <path d="M20 15V24" stroke="#35B44F" strokeWidth="1.5"/>
+                      </svg>
+                      <span className="sbp-title">Оплата через СБП</span>
+                    </div>
+                    <p className="sbp-description">
+                      Моментальная оплата через Систему быстрых платежей — прямо из приложения вашего банка
+                    </p>
 
-                  {/* Альтернативная кнопка — оплата картой на странице T-Bank */}
-                  <div className="payment-alternative">
-                    <p className="payment-divider">или</p>
+                    {/* Контейнер для кнопок T-Bank (СБП, T-Pay) */}
+                    <div 
+                      ref={paymentContainerRef} 
+                      id="tbank-payment-container"
+                      className="tbank-payment-buttons"
+                      style={{ minHeight: '60px' }}
+                    />
+                  </div>
+
+                  {/* Другие способы оплаты — скрыты за кнопкой */}
+                  <div className="other-methods-section">
                     <button
                       type="button"
-                      onClick={handleFallbackPayment}
-                      disabled={loading}
-                      className="btn-secondary btn-lg"
+                      className="other-methods-toggle"
+                      onClick={() => setShowOtherMethods(!showOtherMethods)}
                     >
-                      💳 Оплатить картой
+                      {showOtherMethods ? '▲ Скрыть другие способы' : '▼ Другие способы оплаты'}
                     </button>
-                    <p className="payment-hint">
-                      Перейти на защищённую страницу T-Bank
-                    </p>
+
+                    {showOtherMethods && (
+                      <div className="other-methods-content">
+                        <button
+                          type="button"
+                          onClick={handleFallbackPayment}
+                          disabled={loading}
+                          className="btn-secondary btn-lg"
+                        >
+                          💳 Оплатить банковской картой
+                        </button>
+                        <p className="payment-hint">
+                          Перейти на защищённую страницу T-Bank для оплаты картой
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <button
@@ -388,6 +418,7 @@ export default function CartPage() {
                     onClick={() => {
                       setShowPaymentButtons(false)
                       setOrderData(null)
+                      setShowOtherMethods(false)
                       integrationLoadedRef.current = false
                     }}
                     className="btn-link"
