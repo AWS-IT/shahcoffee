@@ -12,10 +12,12 @@ export function AuthProvider({ children }) {
     const savedToken = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
     
-    if (savedToken && savedUser) {
+    if (savedUser) {
       try {
-        setToken(savedToken);
         setUser(JSON.parse(savedUser));
+        if (savedToken) {
+          setToken(savedToken);
+        }
       } catch (e) {
         console.error('Ошибка загрузки пользователя:', e);
         localStorage.removeItem('token');

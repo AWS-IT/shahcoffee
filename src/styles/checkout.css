@@ -440,6 +440,107 @@
   font-size: 20px;
 }
 
+/* === СБП — приоритетный блок === */
+.sbp-primary-block {
+  background: linear-gradient(135deg, #f0f7ff 0%, #e8f5e9 50%, #fff3e0 100%);
+  border: 2px solid #5B2D8E;
+  border-radius: 20px;
+  padding: 28px 24px 24px;
+  margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+}
+
+.sbp-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #5B2D8E, #7B1FA2);
+  color: white;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 5px 14px;
+  border-radius: 20px;
+  margin-bottom: 16px;
+  text-transform: uppercase;
+}
+
+.sbp-icon-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.sbp-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: #2b2620;
+}
+
+.sbp-description {
+  color: #5a5048;
+  font-size: 14px;
+  margin-bottom: 20px;
+  line-height: 1.5;
+}
+
+.sbp-primary-block .tbank-payment-buttons {
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 16px;
+  padding: 20px;
+  min-height: 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+/* === Другие способы оплаты — скрытый блок === */
+.other-methods-section {
+  margin-top: 16px;
+}
+
+.other-methods-toggle {
+  background: none;
+  border: none;
+  color: #8a7b6a;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 10px 16px;
+  transition: color 0.3s ease;
+  font-weight: 500;
+  width: 100%;
+}
+
+.other-methods-toggle:hover {
+  color: #5a5048;
+}
+
+.other-methods-content {
+  margin-top: 16px;
+  padding: 20px;
+  background: #f9f9f9;
+  border-radius: 16px;
+  animation: fadeSlideDown 0.3s ease;
+}
+
+.other-methods-content .btn-secondary {
+  width: 100%;
+}
+
+@keyframes fadeSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .tbank-payment-buttons {
   background: #f9f9f9;
   border-radius: 16px;
@@ -455,18 +556,6 @@
 .loading-spinner {
   padding: 20px;
   color: #8a7b6a;
-}
-
-.payment-alternative {
-  margin-top: 24px;
-  padding-top: 24px;
-  border-top: 1px dashed #e0e0e0;
-}
-
-.payment-divider {
-  color: #8a7b6a;
-  font-size: 14px;
-  margin-bottom: 16px;
 }
 
 .payment-hint {

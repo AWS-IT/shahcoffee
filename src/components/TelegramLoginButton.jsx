@@ -28,7 +28,7 @@ export default function TelegramLoginButton() {
         const data = await response.json();
         
         if (data.success) {
-          loginWithTelegram(data.user);
+          loginWithTelegram(data.user, data.token);
         } else {
           console.error('Ошибка авторизации:', data.error);
         }
