@@ -1472,8 +1472,43 @@ app.delete('/api/admin/markers/:id', requireAdmin, async (req, res) => {
 
 // ==================== API ПУНКТЫ ВЫДАЧИ ====================
 
+// Запасной список пунктов выдачи, если нет данных в МойСклад и БД
+const DEFAULT_PICKUP_POINTS = [
+  { id: 'default-1', name: 'Москва, Лосевская 6', address: '129347, Россия, г Москва, ул Лосевская, 6', lat: 55.873637, lon: 37.711949, description: null, working_hours: null, is_active: true },
+  { id: 'default-2', name: 'Урус-Мартан, пер. Чехова 21', address: '366522, Россия, Чеченская Респ, Урус-Мартановский р-н, г Урус-Мартан, пер 1-й Чехова, 21', lat: 43.131677, lon: 45.537147, description: null, working_hours: null, is_active: true },
+  { id: 'default-3', name: 'Грозный, ул. Яндарова 20А', address: '364020, Россия, Чеченская Респ, г Грозный, улица Шейха Абдул-Хамида Солсаевича Яндарова, 20А', lat: 43.323797, lon: 45.694496, description: null, working_hours: null, is_active: true },
+];
 
-// Пункты выдачи: сначала из МойСклад (склады с code = 1), при недоступности — из БД
+function normalizeAddress(s) {
+  return (s || '').trim().toLowerCase().replace(/\s+/g, ' ').replace(/[,.]/g, ' ');
+}
+
+// Схлопывает пункты из МойСклад и дефолтные: при одинаковом адресе оставляем дефолтный (с координатами)
+function mergePickupPoints(msPoints, defaultPoints) {
+  const defaultByKey = new Map();
+  defaultPoints.forEach(d => {
+    const key = normalizeAddress(d.address) || normalizeAddress(d.name);
+    if (key) defaultByKey.set(key, d);
+  });
+  const usedDefaultIds = new Set();
+  const merged = [];
+  for (const ms of msPoints) {
+    const key = normalizeAddress(ms.address) || normalizeAddress(ms.name);
+    const match = key ? defaultByKey.get(key) : null;
+    if (match) {
+      merged.push(match);
+      usedDefaultIds.add(match.id);
+    } else {
+      merged.push(ms);
+    }
+  }
+  defaultPoints.forEach(d => {
+    if (!usedDefaultIds.has(d.id)) merged.push(d);
+  });
+  return merged;
+}
+
+// Пункты выдачи: сначала из МойСклад (склады с code = 1), при недоступности — из БД, иначе захардкоженный список
 app.get('/api/pickup-points', async (req, res) => {
   if (PUBLIC_TOKEN) {
     try {
@@ -1502,8 +1537,9 @@ app.get('/api/pickup-points', async (req, res) => {
         };
         });
         if (msPoints.length > 0) {
-          console.log(`📦 Пункты выдачи: МойСклад (code=1) ${msPoints.length}`);
-          return res.json(msPoints);
+          const merged = mergePickupPoints(msPoints, DEFAULT_PICKUP_POINTS);
+          console.log(`📦 Пункты выдачи: МойСклад ${msPoints.length} + дефолтные (схлопнуто: ${merged.length})`);
+          return res.json(merged);
         }
       }
     } catch (err) {

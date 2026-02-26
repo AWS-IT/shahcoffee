@@ -550,6 +550,16 @@ app.post(TBANK_NOTIFICATION_URL, async (req, res) => {
   // Обновляем статус заказа даже если Token не пришёл (временно для отладки)
   const orderId = payload.OrderId;
   const status = payload.Status;
+
+  // До обновления статуса проверяем, был ли заказ в pending (чтобы создать отгрузку только один раз)
+  let orderBeforeUpdate = null;
+  if (orderId) {
+    try {
+      orderBeforeUpdate = await getOrderById(orderId);
+    } catch (e) {
+      console.warn('Failed to get order before update:', e.message);
+    }
+  }
   
   if (orderId && status) {
     try {
@@ -557,6 +567,31 @@ app.post(TBANK_NOTIFICATION_URL, async (req, res) => {
       console.log(`✅ Order ${orderId} status updated to ${status}`);
     } catch (e) {
       console.warn('Failed to update order status:', e.message);
+    }
+  }
+
+  // При успешной оплате (CONFIRMED) создаём отгрузку в МойСклад и шлём уведомление в Telegram
+  const isConfirmed = String(status).toUpperCase() === 'CONFIRMED';
+  const wasPending = orderBeforeUpdate && orderBeforeUpdate.status === 'pending';
+  if (isConfirmed && wasPending && orderId) {
+    try {
+      const order = await getOrderById(orderId);
+      if (order && order.items && order.items.length > 0) {
+        try {
+          await createMoySkladShipment(orderId, order);
+          console.log(`📦 Отгрузка по заказу ${orderId} создана в МойСклад`);
+        } catch (shipErr) {
+          console.error('❌ Ошибка создания отгрузки в МойСклад:', shipErr.message);
+        }
+        try {
+          const message = formatOrderForTelegram(orderId, order, order.totalPrice);
+          await sendTelegramNotification(message);
+        } catch (tgErr) {
+          console.warn('Telegram уведомление не отправлено:', tgErr.message);
+        }
+      }
+    } catch (e) {
+      console.error('❌ Ошибка при обработке оплаченного заказа:', e.message);
     }
   }
 
@@ -1468,6 +1503,13 @@ app.delete('/api/admin/markers/:id', requireAdmin, async (req, res) => {
 // ========== END MAP MARKERS ==========
 
 // ==================== API ПУНКТЫ ВЫДАЧИ ====================
+
+// Запасной список пунктов выдачи, если нет данных в МойСклад и БД
+const DEFAULT_PICKUP_POINTS = [
+  { id: 'default-1', name: 'Москва, Лосевская 6', address: '129347, Россия, г Москва, ул Лосевская, 6', lat: 55.873637, lon: 37.711949, description: null, working_hours: null, is_active: true },
+  { id: 'default-2', name: 'Урус-Мартан, пер. Чехова 21', address: '366522, Россия, Чеченская Респ, Урус-Мартановский р-н, г Урус-Мартан, пер 1-й Чехова, 21', lat: 43.131677, lon: 45.537147, description: null, working_hours: null, is_active: true },
+  { id: 'default-3', name: 'Грозный, ул. Яндарова 20А', address: '364020, Россия, Чеченская Респ, г Грозный, улица Шейха Абдул-Хамида Солсаевича Яндарова, 20А', lat: 43.323797, lon: 45.694496, description: null, working_hours: null, is_active: true },
+];
 
 function normalizeAddress(s) {
   return (s || '').trim().toLowerCase().replace(/\s+/g, ' ').replace(/[,.]/g, ' ');
