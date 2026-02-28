@@ -118,7 +118,6 @@ export default function OrderPage() {
       <div className="container">
         <div className="order-header">
           <h1>📦 Ваш заказ</h1>
-          <p className="order-subtitle">Отслеживание доставки</p>
         </div>
 
         <div className="order-content">

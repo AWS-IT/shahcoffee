@@ -26,6 +26,7 @@ export default function CartPage() {
   const [coordinates, setCoordinates] = useState(null)
   const [orderData, setOrderData] = useState(null)
   const [pickupPoints, setPickupPoints] = useState([])
+  const [stockByStore, setStockByStore] = useState({})
   const paymentContainerRef = useRef(null)
   const integrationLoadedRef = useRef(false)
 
@@ -125,16 +126,61 @@ export default function CartPage() {
     loadTBankWidget()
   }, [showPaymentButtons, orderData, totalPrice, formData, clearCart, navigate])
 
-  // Загрузка пунктов выдачи при открытии формы оформления заказа
+  // Загрузка пунктов выдачи и остатков при открытии формы оформления заказа
   useEffect(() => {
     if (!showCheckout) return
     let cancelled = false
+    
+    // Загружаем пункты выдачи
     fetch('/api/pickup-points')
       .then((res) => res.ok ? res.json() : [])
       .then((data) => { if (!cancelled) setPickupPoints(Array.isArray(data) ? data : []) })
       .catch(() => { if (!cancelled) setPickupPoints([]) })
+    
+    // Загружаем остатки по складам
+    fetch('/api/pickup-points/stock')
+      .then((res) => res.ok ? res.json() : {})
+      .then((data) => { if (!cancelled) setStockByStore(data || {}) })
+      .catch(() => { if (!cancelled) setStockByStore({}) })
+    
     return () => { cancelled = true }
   }, [showCheckout])
+
+  // Пункты выдачи с остатками — скрываем те, где нет товаров из корзины
+  const availablePickupPoints = pickupPoints.filter(point => {
+    // Если у пункта нет привязки к складу — показываем всегда (доставка)
+    if (!point.store_id) return true
+    // Если нет данных по остаткам — показываем (не блокируем)
+    const storeStock = stockByStore[point.store_id]
+    if (!storeStock || storeStock.length === 0) return false
+    // Проверяем, есть ли хотя бы один товар из корзины на этом складе
+    return cart.some(cartItem => {
+      return storeStock.some(s => s.stock > 0 && (
+        s.name === cartItem.name || s.code === cartItem.code
+      ))
+    })
+  })
+
+  // Предупреждение, если товары из корзины находятся на разных пунктах выдачи
+  const cartItemsByPickup = (() => {
+    const result = new Map() // pickupPointId -> [cartItemNames]
+    for (const cartItem of cart) {
+      for (const point of availablePickupPoints) {
+        if (!point.store_id) continue
+        const storeStock = stockByStore[point.store_id]
+        if (!storeStock) continue
+        const hasItem = storeStock.some(s => s.stock > 0 && (
+          s.name === cartItem.name || s.code === cartItem.code
+        ))
+        if (hasItem) {
+          if (!result.has(point.id)) result.set(point.id, { point, items: [] })
+          result.get(point.id).items.push(cartItem.name)
+        }
+      }
+    }
+    return result
+  })()
+  const multiPickupWarning = cartItemsByPickup.size > 1
 
   const handleAddressChange = (address) => {
     setFormData({ ...formData, address })
@@ -311,12 +357,25 @@ export default function CartPage() {
                       onChange={handleAddressChange}
                       onSelect={handleAddressSelect}
                       placeholder="Начните вводить адрес или выберите пункт выдачи..."
-                      pickupPoints={pickupPoints}
+                      pickupPoints={availablePickupPoints}
                     />
                     {coordinates && (
                       <p className="address-confirmed">✓ Адрес подтверждён</p>
                     )}
                   </div>
+
+                  {multiPickupWarning && (
+                    <div className="warning-message" style={{ background: '#fff3cd', border: '1px solid #ffc107', borderRadius: 8, padding: '12px 16px', marginBottom: 16, color: '#856404' }}>
+                      <strong>⚠ Внимание:</strong> Товары из вашей корзины находятся в разных пунктах выдачи.
+                      <ul style={{ margin: '8px 0 0', paddingLeft: 20 }}>
+                        {[...cartItemsByPickup.values()].map(({ point, items }) => (
+                          <li key={point.id}>
+                            <strong>{point.name}</strong>: {items.join(', ')}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
                   {error && (
                     <div className="error-message">

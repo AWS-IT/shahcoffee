@@ -44,6 +44,7 @@ export default function Admin() {
     lon: '',
     description: '',
     working_hours: '',
+    store_id: '',
     is_active: true
   })
 
@@ -308,6 +309,7 @@ export default function Admin() {
       lon: '',
       description: '',
       working_hours: '',
+      store_id: '',
       is_active: true
     })
     setPickupAddressInput('')
@@ -351,6 +353,7 @@ export default function Admin() {
       lon: point.lon,
       description: point.description || '',
       working_hours: point.working_hours || '',
+      store_id: point.store_id || '',
       is_active: point.is_active
     })
     setPickupAddressInput(point.address || '')
@@ -620,6 +623,28 @@ export default function Admin() {
               </div>
 
               <div className="form-group">
+                <label>Склад в МойСклад</label>
+                {storesLoading ? (
+                  <p>Загрузка складов...</p>
+                ) : (
+                  <select
+                    value={pickupForm.store_id}
+                    onChange={(e) => setPickupForm({ ...pickupForm, store_id: e.target.value })}
+                  >
+                    <option value="">-- Не привязан --</option>
+                    {stores.map(store => (
+                      <option key={store.id} value={store.id}>
+                        {store.name} {store.address ? `(${store.address})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <p className="form-hint" style={{ fontSize: '12px', color: '#8a7b6a', marginTop: '4px' }}>
+                  Привяжите пункт выдачи к складу, чтобы отображались остатки товаров
+                </p>
+              </div>
+
+              <div className="form-group">
                 <label>Статус</label>
                 <select
                   value={pickupForm.is_active ? 'true' : 'false'}
@@ -656,6 +681,11 @@ export default function Admin() {
                       {point.address && <p className="marker-address">{point.address}</p>}
                       {(point.description || point.working_hours) && (
                         <p className="marker-desc">{point.description || ''} {point.working_hours || ''}</p>
+                      )}
+                      {point.store_id && (
+                        <p className="marker-desc" style={{ color: '#008B9D' }}>
+                          📦 Склад: {stores.find(s => s.id === point.store_id)?.name || point.store_id.slice(0, 8) + '...'}
+                        </p>
                       )}
                     </div>
                   </div>

@@ -1,10 +1,10 @@
 /* Profile Page Styles */
 .profile-page {
   min-height: calc(100vh - 200px);
-  padding: 40px 20px 60px;
+  padding: 100px 20px 60px;
   background: #f6f1e9;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
 }
 

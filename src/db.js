@@ -119,12 +119,21 @@ export async function initDatabase() {
         lon DECIMAL(11, 8) NOT NULL,
         description TEXT,
         working_hours VARCHAR(255),
+        store_id VARCHAR(255) DEFAULT NULL,
         is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         INDEX idx_is_active (is_active)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
+
+    // Миграция: добавляем store_id если его нет
+    try {
+      await connection.query(`ALTER TABLE pickup_points ADD COLUMN store_id VARCHAR(255) DEFAULT NULL`);
+      console.log('✓ Добавлена колонка store_id в pickup_points');
+    } catch (e) {
+      // Колонка уже существует — игнорируем
+    }
     
     connection.release();
     console.log('✓ База данных инициализирована');
@@ -554,7 +563,7 @@ export async function deleteMapMarker(id) {
 // Получить активные пункты выдачи (для чекаута и публичного API)
 export async function getPickupPoints() {
   const [rows] = await pool.query(
-    'SELECT id, name, address, lat, lon, description, working_hours, is_active FROM pickup_points WHERE is_active = TRUE ORDER BY name'
+    'SELECT id, name, address, lat, lon, description, working_hours, store_id, is_active FROM pickup_points WHERE is_active = TRUE ORDER BY name'
   );
   return rows.map((row) => ({
     id: row.id,
@@ -564,6 +573,7 @@ export async function getPickupPoints() {
     lon: row.lon != null ? parseFloat(row.lon) : null,
     description: row.description,
     working_hours: row.working_hours,
+    store_id: row.store_id || null,
     is_active: Boolean(row.is_active),
   }));
 }
@@ -571,7 +581,7 @@ export async function getPickupPoints() {
 // Получить все пункты выдачи (для админки)
 export async function getAllPickupPoints() {
   const [rows] = await pool.query(
-    'SELECT id, name, address, lat, lon, description, working_hours, is_active, created_at, updated_at FROM pickup_points ORDER BY name'
+    'SELECT id, name, address, lat, lon, description, working_hours, store_id, is_active, created_at, updated_at FROM pickup_points ORDER BY name'
   );
   return rows.map((row) => ({
     id: row.id,
@@ -581,6 +591,7 @@ export async function getAllPickupPoints() {
     lon: row.lon != null ? parseFloat(row.lon) : null,
     description: row.description,
     working_hours: row.working_hours,
+    store_id: row.store_id || null,
     is_active: Boolean(row.is_active),
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -589,21 +600,21 @@ export async function getAllPickupPoints() {
 
 // Создать пункт выдачи
 export async function createPickupPoint(pickup) {
-  const { name, address, lat, lon, description, working_hours, is_active } = pickup;
+  const { name, address, lat, lon, description, working_hours, store_id, is_active } = pickup;
   const [result] = await pool.query(
-    `INSERT INTO pickup_points (name, address, lat, lon, description, working_hours, is_active)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [name, address || '', lat, lon, description || null, working_hours || null, is_active !== false]
+    `INSERT INTO pickup_points (name, address, lat, lon, description, working_hours, store_id, is_active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [name, address || '', lat, lon, description || null, working_hours || null, store_id || null, is_active !== false]
   );
   return { id: result.insertId, ...pickup };
 }
 
 // Обновить пункт выдачи
 export async function updatePickupPoint(id, pickup) {
-  const { name, address, lat, lon, description, working_hours, is_active } = pickup;
+  const { name, address, lat, lon, description, working_hours, store_id, is_active } = pickup;
   await pool.query(
-    `UPDATE pickup_points SET name = ?, address = ?, lat = ?, lon = ?, description = ?, working_hours = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-    [name, address, lat, lon, description || null, working_hours || null, is_active !== false, id]
+    `UPDATE pickup_points SET name = ?, address = ?, lat = ?, lon = ?, description = ?, working_hours = ?, store_id = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [name, address, lat, lon, description || null, working_hours || null, store_id || null, is_active !== false, id]
   );
   return { id, ...pickup };
 }

@@ -1604,7 +1604,7 @@ app.get('/api/admin/pickup-points', requireAdmin, async (req, res) => {
 // Создать пункт выдачи (админка)
 app.post('/api/admin/pickup-points', requireAdmin, async (req, res) => {
   try {
-    const { name, address, lat, lon, description, working_hours, is_active } = req.body;
+    const { name, address, lat, lon, description, working_hours, store_id, is_active } = req.body;
 
     if (!name || lat == null || lon == null) {
       return res.status(400).json({ error: 'Name, lat and lon are required' });
@@ -1617,6 +1617,7 @@ app.post('/api/admin/pickup-points', requireAdmin, async (req, res) => {
       lon,
       description: description || null,
       working_hours: working_hours || null,
+      store_id: store_id || null,
       is_active: is_active !== false,
     });
     console.log('✓ Пункт выдачи создан:', name);
@@ -1630,7 +1631,7 @@ app.post('/api/admin/pickup-points', requireAdmin, async (req, res) => {
 // Обновить пункт выдачи (админка)
 app.put('/api/admin/pickup-points/:id', requireAdmin, async (req, res) => {
   try {
-    const { name, address, lat, lon, description, working_hours, is_active } = req.body;
+    const { name, address, lat, lon, description, working_hours, store_id, is_active } = req.body;
     const point = await updatePickupPoint(req.params.id, {
       name,
       address: address ?? '',
@@ -1638,6 +1639,7 @@ app.put('/api/admin/pickup-points/:id', requireAdmin, async (req, res) => {
       lon,
       description: description ?? null,
       working_hours: working_hours ?? null,
+      store_id: store_id ?? null,
       is_active: is_active !== false,
     });
     console.log('✓ Пункт выдачи обновлён:', name);
@@ -1661,6 +1663,48 @@ app.delete('/api/admin/pickup-points/:id', requireAdmin, async (req, res) => {
 });
 
 // ========== END PICKUP POINTS ==========
+
+// Получить остатки товаров на складах пунктов выдачи (публичный)
+app.get('/api/pickup-points/stock', async (req, res) => {
+  if (!PUBLIC_TOKEN) {
+    return res.json({});
+  }
+  try {
+    const points = await getPickupPoints();
+    const storeIds = points.filter(p => p.store_id).map(p => p.store_id);
+    if (storeIds.length === 0) return res.json({});
+
+    const stockUrl = `${ADMIN_API_URL}/api/remap/1.2/report/stock/all?limit=1000&groupBy=store,variant`;
+    const stockResponse = await fetch(stockUrl, {
+      headers: { 'Authorization': `Bearer ${PUBLIC_TOKEN}`, 'Content-Type': 'application/json' },
+    });
+    if (!stockResponse.ok) {
+      console.warn('МойСклад stock API ошибка:', stockResponse.status);
+      return res.json({});
+    }
+    const stockData = await stockResponse.json();
+    
+    const stockByStore = {};
+    for (const row of (stockData.rows || [])) {
+      const storeHref = row.store?.meta?.href || '';
+      const storeId = storeHref.split('/').pop();
+      if (!storeIds.includes(storeId)) continue;
+      if (!stockByStore[storeId]) stockByStore[storeId] = [];
+      stockByStore[storeId].push({
+        productId: (row.article || row.meta?.href || '').split('/').pop(),
+        name: row.name,
+        stock: row.stock || 0,
+        code: row.code || null,
+      });
+    }
+
+    console.log(`📦 Остатки по складам: ${Object.keys(stockByStore).length} складов`);
+    res.json(stockByStore);
+  } catch (error) {
+    console.error('❌ Ошибка получения остатков:', error.message);
+    res.json({});
+  }
+});
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
