@@ -1539,8 +1539,17 @@ function mergePickupPoints(msPoints, defaultPoints) {
   return merged;
 }
 
-// Пункты выдачи: сначала из МойСклад (склады), при недоступности — из БД, иначе захардкоженный список
+// Пункты выдачи: данные из БД (с автосидом), при доступности МойСклад — мержим
 app.get('/api/pickup-points', async (req, res) => {
+  // 1. Загружаем пункты из БД (там уже есть засиженные по умолчанию)
+  let dbPoints = [];
+  try {
+    dbPoints = await getPickupPoints();
+  } catch (error) {
+    console.error('❌ Ошибка получения пунктов выдачи из БД:', error.message || error);
+  }
+
+  // 2. Если есть токен МойСклад — мержим со складами (обогащаем данные)
   if (PUBLIC_TOKEN) {
     try {
       const response = await fetch(`${ADMIN_API_URL}/api/remap/1.2/entity/store`, {
@@ -1548,7 +1557,6 @@ app.get('/api/pickup-points', async (req, res) => {
       });
       if (response.ok) {
         const data = await response.json();
-        // Используем только те склады, которые помечены кодом "1" как пункты выдачи
         const pickupStores = (data.rows || []).filter(store => String(store.code || '').trim() === '1');
         const msPoints = pickupStores.map(store => {
           let address = store.address;
@@ -1568,25 +1576,19 @@ app.get('/api/pickup-points', async (req, res) => {
           };
         });
         if (msPoints.length > 0) {
-          const merged = mergePickupPoints(msPoints, DEFAULT_PICKUP_POINTS);
-          console.log(`📦 Пункты выдачи: МойСклад ${msPoints.length} + дефолтные (схлопнуто: ${merged.length})`);
+          const merged = mergePickupPoints(msPoints, dbPoints.length > 0 ? dbPoints : DEFAULT_PICKUP_POINTS);
+          console.log(`📦 Пункты выдачи: МойСклад ${msPoints.length} + БД ${dbPoints.length} (итого: ${merged.length})`);
           return res.json(merged);
         }
       }
     } catch (err) {
-      console.warn('МойСклад недоступен для пунктов выдачи, пробуем БД:', err.message);
+      console.warn('МойСклад недоступен для пунктов выдачи:', err.message);
     }
   }
-  try {
-    const points = await getPickupPoints();
-    if (points.length > 0) return res.json(points);
-  } catch (error) {
-    console.error('❌ Ошибка получения пунктов выдачи:', error.message || error);
-    if (error.code !== 'ECONNREFUSED' && error.code !== 'ECONNRESET' && error.code !== 'ETIMEDOUT') {
-      return res.status(500).json({ error: 'Failed to get pickup points' });
-    }
-  }
-  console.log('📦 Пункты выдачи: запасной список (нет данных в МойСклад/БД)');
+
+  // 3. Отдаём из БД или запасной список
+  if (dbPoints.length > 0) return res.json(dbPoints);
+  console.log('📦 Пункты выдачи: запасной список (нет данных в БД)');
   return res.json(DEFAULT_PICKUP_POINTS);
 });
 

@@ -134,6 +134,23 @@ export async function initDatabase() {
     } catch (e) {
       // Колонка уже существует — игнорируем
     }
+
+    // Авто-сидирование: добавляем пункты выдачи по умолчанию если таблица пуста
+    const [existingPoints] = await connection.query('SELECT COUNT(*) as cnt FROM pickup_points');
+    if (existingPoints[0].cnt === 0) {
+      const defaultPoints = [
+        { name: 'Москва, Лосевская 6', address: '129347, Россия, г Москва, ул Лосевская, 6', lat: 55.873637, lon: 37.711949 },
+        { name: 'Урус-Мартан, пер. Чехова 21', address: '366522, Россия, Чеченская Респ, Урус-Мартановский р-н, г Урус-Мартан, пер 1-й Чехова, 21', lat: 43.131677, lon: 45.537147 },
+        { name: 'Грозный, ул. Яндарова 20А', address: '364020, Россия, Чеченская Респ, г Грозный, улица Шейха Абдул-Хамида Солсаевича Яндарова, 20А', lat: 43.323797, lon: 45.694496 },
+      ];
+      for (const p of defaultPoints) {
+        await connection.query(
+          'INSERT INTO pickup_points (name, address, lat, lon, is_active) VALUES (?, ?, ?, ?, TRUE)',
+          [p.name, p.address, p.lat, p.lon]
+        );
+      }
+      console.log('✓ Добавлены пункты выдачи по умолчанию:', defaultPoints.length);
+    }
     
     connection.release();
     console.log('✓ База данных инициализирована');
