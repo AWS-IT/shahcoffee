@@ -1642,7 +1642,7 @@ app.get('/api/pickup-points/stock', async (req, res) => {
     if (storeIds.length === 0) return res.json({});
 
     // Запрашиваем остатки из МойСклад
-    const stockUrl = `${ADMIN_API_URL}/api/remap/1.2/report/stock/all?limit=1000&groupBy=store,variant`;
+    const stockUrl = `${ADMIN_API_URL}/api/remap/1.2/report/stock/all?limit=1000&groupBy=store`;
     const stockResponse = await fetch(stockUrl, {
       headers: { 'Authorization': `Bearer ${PUBLIC_TOKEN}`, 'Content-Type': 'application/json' },
     });
@@ -1660,7 +1660,7 @@ app.get('/api/pickup-points/stock', async (req, res) => {
       if (!storeIds.includes(storeId)) continue;
       if (!stockByStore[storeId]) stockByStore[storeId] = [];
       stockByStore[storeId].push({
-        productId: (row.article || row.meta?.href || '').split('/').pop(),
+        productId: (row.meta?.href || '').split('/').pop() || null,
         name: row.name,
         stock: row.stock || 0,
         code: row.code || null,

@@ -147,31 +147,54 @@ export default function CartPage() {
   }, [showCheckout])
 
   // Пункты выдачи с остатками — скрываем те, где нет товаров из корзины
+  const stockDataAvailable = Object.keys(stockByStore).length > 0
   const availablePickupPoints = pickupPoints.filter(point => {
-    // Если у пункта нет привязки к складу — показываем всегда (доставка)
+    // Если у пункта нет привязки к складу — показываем всегда
     if (!point.store_id) return true
-    // Если нет данных по остаткам — показываем (не блокируем)
+    // Если данные об остатках ещё не загружены / API недоступен — показываем (fail-open)
+    if (!stockDataAvailable) return true
     const storeStock = stockByStore[point.store_id]
-    if (!storeStock || storeStock.length === 0) return false
+    // Если для этого склада нет данных в ответе API — показываем (склад может быть не в отчёте)
+    if (storeStock === undefined) return true
+    // Если склад есть в отчёте, но совсем пустой — скрываем
+    if (storeStock.length === 0) return false
+    // Если корзина пуста — показываем все пункты
+    if (cart.length === 0) return true
     // Проверяем, есть ли хотя бы один товар из корзины на этом складе
     return cart.some(cartItem => {
-      return storeStock.some(s => s.stock > 0 && (
-        s.name === cartItem.name || s.code === cartItem.code
-      ))
+      const cartName = (cartItem.name || '').trim().toLowerCase()
+      const cartCode = (cartItem.code || '').trim()
+      const cartId = cartItem.id || null
+      return storeStock.some(s => {
+        if (s.stock <= 0) return false
+        const sName = (s.name || '').trim().toLowerCase()
+        const sCode = (s.code || '').trim()
+        return (cartId && s.productId && s.productId === cartId) ||
+               sName === cartName ||
+               (cartCode && sCode && sCode === cartCode)
+      })
     })
   })
 
-  // Предупреждение, если товары из корзины находятся на разных пунктах выдачи
+    // Предупреждение, если товары из корзины находятся на разных пунктах выдачи
   const cartItemsByPickup = (() => {
     const result = new Map() // pickupPointId -> [cartItemNames]
     for (const cartItem of cart) {
+      const cartName = (cartItem.name || '').trim().toLowerCase()
+      const cartCode = (cartItem.code || '').trim()
+      const cartId = cartItem.id || null
       for (const point of availablePickupPoints) {
         if (!point.store_id) continue
         const storeStock = stockByStore[point.store_id]
         if (!storeStock) continue
-        const hasItem = storeStock.some(s => s.stock > 0 && (
-          s.name === cartItem.name || s.code === cartItem.code
-        ))
+        const hasItem = storeStock.some(s => {
+          if (s.stock <= 0) return false
+          const sName = (s.name || '').trim().toLowerCase()
+          const sCode = (s.code || '').trim()
+          return (cartId && s.productId && s.productId === cartId) ||
+                 sName === cartName ||
+                 (cartCode && sCode && sCode === cartCode)
+        })
         if (hasItem) {
           if (!result.has(point.id)) result.set(point.id, { point, items: [] })
           result.get(point.id).items.push(cartItem.name)
