@@ -33,7 +33,8 @@ export default function ProductPage() {
     const rows = product.images?.rows
     if (rows && rows.length > 0) {
       const img = rows[0]
-      return img.meta?.downloadHref || img.miniature?.downloadHref || img.tiny?.href || null
+      const raw = img.meta?.downloadHref || img.miniature?.downloadHref || img.tiny?.href || null;
+      return raw ? `/api/ms-image?url=${encodeURIComponent(raw)}` : null;
     }
     return null
   }

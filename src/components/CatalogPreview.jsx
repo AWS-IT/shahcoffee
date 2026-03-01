@@ -38,10 +38,8 @@ export default function CatalogPreview() {
 
   const getImageUrl = (product) => {
     const img = product.images?.rows?.[0];
-    if (img?.meta?.downloadHref) return img.meta.downloadHref;
-    if (img?.miniature?.downloadHref) return img.miniature.downloadHref;
-    if (img?.tiny?.href) return img.tiny.href;
-    return null;
+    const raw = img?.meta?.downloadHref || img?.miniature?.downloadHref || img?.tiny?.href || null;
+    return raw ? `/api/ms-image?url=${encodeURIComponent(raw)}` : null;
   };
 
   if (loading) return <div className="catalog-loading">Загрузка...</div>

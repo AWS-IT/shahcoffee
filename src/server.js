@@ -214,6 +214,33 @@ app.all('/api_ms/{*path}', async (req, res) => {
   }
 });
 
+// Прокси для изображений МойСклад (требуют Bearer-авторизацию)
+app.get('/api/ms-image', async (req, res) => {
+  const imageUrl = req.query.url;
+  if (!imageUrl || !imageUrl.startsWith('https://')) {
+    return res.status(400).send('Invalid URL');
+  }
+  try {
+    const response = await fetch(imageUrl, {
+      headers: {
+        'Authorization': `Bearer ${PUBLIC_TOKEN}`,
+        'User-Agent': 'ShahCoffee/1.0',
+      },
+    });
+    if (!response.ok) {
+      return res.status(response.status).send('Image fetch failed');
+    }
+    const contentType = response.headers.get('content-type') || 'image/jpeg';
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    const buffer = await response.arrayBuffer();
+    res.send(Buffer.from(buffer));
+  } catch (e) {
+    console.error('❌ Ошибка загрузки изображения:', e.message);
+    res.status(500).send('Image proxy error');
+  }
+});
+
 // --- T-Bank Касса конфигурация ---
 const TBANK_TERMINAL = process.env.TBANK_TERMINAL; // Например: 1769767428862DEMO
 const TBANK_PASSWORD = process.env.TBANK_PASSWORD; // Пароль для формирования Token

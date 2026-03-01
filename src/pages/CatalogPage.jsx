@@ -55,10 +55,8 @@ export default function CatalogPage() {
 
   const getImageUrl = (product) => {
     const img = product.images?.rows?.[0];
-    if (img?.meta?.downloadHref) return img.meta.downloadHref;
-    if (img?.miniature?.downloadHref) return img.miniature.downloadHref;
-    if (img?.tiny?.href) return img.tiny.href;
-    return null;
+    const raw = img?.meta?.downloadHref || img?.miniature?.downloadHref || img?.tiny?.href || null;
+    return raw ? `/api/ms-image?url=${encodeURIComponent(raw)}` : null;
   };
 
   // Получаем уникальные названия для автодополнения, но только если searchTerm не пустой
