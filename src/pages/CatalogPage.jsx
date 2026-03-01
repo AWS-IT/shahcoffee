@@ -55,9 +55,9 @@ export default function CatalogPage() {
 
   const getImageUrl = (product) => {
     const img = product.images?.rows?.[0];
+    if (img?.meta?.downloadHref) return img.meta.downloadHref;
     if (img?.miniature?.downloadHref) return img.miniature.downloadHref;
     if (img?.tiny?.href) return img.tiny.href;
-    if (img?.meta?.downloadHref) return img.meta.downloadHref;
     return null;
   };
 
