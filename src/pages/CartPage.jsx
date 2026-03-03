@@ -135,7 +135,13 @@ export default function CartPage() {
     // Загружаем пункты выдачи
     fetch('/api/pickup-points')
       .then((res) => res.ok ? res.json() : [])
-      .then((data) => { if (!cancelled) setPickupPoints(Array.isArray(data) ? data : []) })
+      .then((data) => {
+        if (!cancelled) {
+          const pts = Array.isArray(data) ? data : []
+          console.log('📍 Пункты выдачи:', pts.map(p => ({ id: p.id, name: p.name, store_id: p.store_id })))
+          setPickupPoints(pts)
+        }
+      })
       .catch(() => { if (!cancelled) setPickupPoints([]) })
     
     // Загружаем остатки по складам
@@ -143,6 +149,8 @@ export default function CartPage() {
       .then((res) => res.ok ? res.json() : { loaded: false, data: {} })
       .then((result) => {
         if (!cancelled) {
+          console.log('📦 Остатки по складам (loaded:', result.loaded, '):', JSON.stringify(result.data).substring(0, 500))
+          console.log('🛒 Корзина для фильтрации:', cart.map(c => ({ id: c.id, name: c.name, code: c.code })))
           setStockByStore(result.data || {})
           setStockLoaded(result.loaded === true)
         }
@@ -153,31 +161,53 @@ export default function CartPage() {
   }, [showCheckout])
 
   // Пункты выдачи с остатками — скрываем те, где нет товаров из корзины
-  const availablePickupPoints = pickupPoints.filter(point => {
-    // Если у пункта нет привязки к складу — показываем всегда
-    if (!point.store_id) return true
-    // Если API остатков не загрузился (ошибка/недоступен) — показываем всё (fail-open)
-    if (!stockLoaded) return true
-    const storeStock = stockByStore[point.store_id]
-    // Если склад есть в ответе, но массив пустой или все stock <= 0 — скрываем
-    if (!storeStock || storeStock.length === 0) return false
-    // Если корзина пуста — показываем только пункты, где хоть что-то есть
-    if (cart.length === 0) return storeStock.some(s => s.stock > 0)
-    // Проверяем, есть ли хотя бы один товар из корзины на этом складе
-    return cart.some(cartItem => {
-      const cartName = (cartItem.name || '').trim().toLowerCase()
-      const cartCode = (cartItem.code || '').trim()
-      const cartId = cartItem.id || null
-      return storeStock.some(s => {
-        if (s.stock <= 0) return false
-        const sName = (s.name || '').trim().toLowerCase()
-        const sCode = (s.code || '').trim()
-        return (cartId && s.productId && s.productId === cartId) ||
-               sName === cartName ||
-               (cartCode && sCode && sCode === cartCode)
+  const availablePickupPoints = (() => {
+    console.log('🔍 Фильтрация ПВЗ: stockLoaded=', stockLoaded, 'cart.length=', cart.length,
+      'pickupPoints=', pickupPoints.length, 'stockByStore keys=', Object.keys(stockByStore))
+    return pickupPoints.filter(point => {
+      // Если у пункта нет привязки к складу — показываем всегда
+      if (!point.store_id) {
+        console.log(`  ✅ ${point.name}: нет store_id — показываем`)
+        return true
+      }
+      // Если API остатков не загрузился (ошибка/недоступен) — показываем всё (fail-open)
+      if (!stockLoaded) {
+        console.log(`  ⚠️ ${point.name}: остатки не загружены — показываем (fail-open)`)
+        return true
+      }
+      const storeStock = stockByStore[point.store_id]
+      console.log(`  📋 ${point.name}: store_id=${point.store_id}, storeStock=`, storeStock ? `${storeStock.length} items` : 'undefined')
+      // Если склад есть в ответе, но массив пустой или все stock <= 0 — скрываем
+      if (!storeStock || storeStock.length === 0) {
+        console.log(`  ❌ ${point.name}: нет остатков — скрываем`)
+        return false
+      }
+      // Если корзина пуста — показываем только пункты, где хоть что-то есть
+      if (cart.length === 0) {
+        const hasAny = storeStock.some(s => s.stock > 0)
+        console.log(`  ${hasAny ? '✅' : '❌'} ${point.name}: корзина пуста, есть остатки=${hasAny}`)
+        return hasAny
+      }
+      // Проверяем, есть ли хотя бы один товар из корзины на этом складе
+      const found = cart.some(cartItem => {
+        const cartName = (cartItem.name || '').trim().toLowerCase()
+        const cartCode = (cartItem.code || '').trim()
+        const cartId = cartItem.id || null
+        return storeStock.some(s => {
+          if (s.stock <= 0) return false
+          const sName = (s.name || '').trim().toLowerCase()
+          const sCode = (s.code || '').trim()
+          const match = (cartId && s.productId && s.productId === cartId) ||
+                 sName === cartName ||
+                 (cartCode && sCode && sCode === cartCode)
+          if (match) console.log(`    ✅ Совпадение: cart="${cartItem.name}" (id=${cartId}) ↔ stock="${s.name}" (id=${s.productId})`)
+          return match
+        })
       })
+      console.log(`  ${found ? '✅' : '❌'} ${point.name}: товар из корзины найден=${found}`)
+      return found
     })
-  })
+  })()
 
     // Предупреждение, если товары из корзины находятся на разных пунктах выдачи
   const cartItemsByPickup = (() => {

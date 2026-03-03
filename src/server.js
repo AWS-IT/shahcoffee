@@ -1751,22 +1751,24 @@ app.get('/api/pickup-points/stock', async (req, res) => {
     const storeIds = points.filter(p => p.store_id).map(p => p.store_id);
     if (storeIds.length === 0) return res.json({ loaded: true, data: {} });
 
-    // Запрашиваем остатки из МойСклад (с пагинацией)
+    // Запрашиваем остатки из МойСклад bystore (с пагинацией)
     let allRows = [];
     let offset = 0;
-    const limit = 1000;
+    const limit = 100;
     while (true) {
-      const stockUrl = `${ADMIN_API_URL}/api/remap/1.2/report/stock/all?limit=${limit}&offset=${offset}&groupBy=store`;
+      const stockUrl = `${ADMIN_API_URL}/api/remap/1.2/report/stock/bystore?limit=${limit}&offset=${offset}`;
+      console.log(`📦 Fetching stock bystore: offset=${offset}, limit=${limit}`);
       const stockResponse = await fetch(stockUrl, {
-        headers: { 'Authorization': `Bearer ${PUBLIC_TOKEN}`, 'Content-Type': 'application/json' },
+        headers: { 'Authorization': `Bearer ${PUBLIC_TOKEN}` },
       });
       if (!stockResponse.ok) {
-        console.warn('МойСклад stock API ошибка:', stockResponse.status);
+        console.warn('МойСклад stock API ошибка:', stockResponse.status, await stockResponse.text().catch(() => ''));
         return res.json({ loaded: false, data: {} });
       }
       const stockData = await stockResponse.json();
       const rows = stockData.rows || [];
       allRows = allRows.concat(rows);
+      console.log(`📦 Got ${rows.length} rows (total so far: ${allRows.length})`);
       if (rows.length < limit) break;
       offset += limit;
     }
@@ -1776,19 +1778,37 @@ app.get('/api/pickup-points/stock', async (req, res) => {
     for (const sid of storeIds) {
       stockByStore[sid] = [];
     }
+
+    console.log('🔍 storeIds we are looking for:', storeIds);
+    console.log('🔍 Total product rows from bystore:', allRows.length);
+
+    // bystore endpoint: каждый row — это товар, row.stockByStore — массив остатков по складам
     for (const row of allRows) {
-      const storeHref = row.store?.meta?.href || '';
-      const storeId = storeHref.split('/').pop();
-      if (!storeIds.includes(storeId)) continue;
-      stockByStore[storeId].push({
-        productId: (row.assortment?.meta?.href || '').split('/').pop() || null,
-        name: row.name,
-        stock: row.stock || 0,
-        code: row.code || null,
-      });
+      const productHref = (row.meta?.href || '').split('?')[0]; // убираем ?expand=supplier
+      const productId = productHref.split('/').pop();
+      const productName = row.name || '';
+      const productCode = row.code || '';
+
+      if (!row.stockByStore || !Array.isArray(row.stockByStore)) continue;
+
+      for (const storeEntry of row.stockByStore) {
+        const storeHref = storeEntry.meta?.href || '';
+        const storeId = storeHref.split('/').pop();
+        if (!storeIds.includes(storeId)) continue;
+        const stock = storeEntry.stock || 0;
+        if (stock <= 0) continue;
+        stockByStore[storeId].push({
+          productId,
+          name: productName,
+          stock,
+          code: productCode,
+        });
+        console.log(`  ✅ Store ${storeEntry.name} (${storeId}): ${productName} x${stock}`);
+      }
     }
 
-    console.log(`📦 Остатки по складам: ${Object.keys(stockByStore).length} складов, ${allRows.length} строк`);
+    const totalItems = Object.values(stockByStore).reduce((s, arr) => s + arr.length, 0);
+    console.log(`📦 Остатки по складам: ${Object.keys(stockByStore).length} складов, ${totalItems} позиций с остатком > 0`);
     res.json({ loaded: true, data: stockByStore });
   } catch (error) {
     console.error('❌ Ошибка получения остатков:', error.message);
