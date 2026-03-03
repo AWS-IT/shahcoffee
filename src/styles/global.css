@@ -668,7 +668,7 @@ body.menu-open {
 .hero__slider {
   position: relative;
   width: 100%;
-  padding-bottom: 100%;
+  aspect-ratio: 1 / 1;
   border-radius: 24px;
   overflow: hidden;
   box-shadow: 0 15px 40px rgba(0, 0, 0, 0.12);
@@ -676,9 +676,6 @@ body.menu-open {
 }
 
 .hero__slider-track {
-  position: absolute;
-  top: 0;
-  left: 0;
   width: 100%;
   height: 100%;
   display: flex;
@@ -1867,12 +1864,12 @@ body.menu-open {
   overflow: hidden;
   background: #f9f9f9;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-  aspect-ratio: 1/1;
+  aspect-ratio: 1 / 1;
 }
 @media (min-width: 992px) {
   .product-page__gallery {
-    max-width: none;
-    aspect-ratio: unset;
+    max-width: 520px;
+    margin: 0;
   }
 }
 
