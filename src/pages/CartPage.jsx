@@ -27,6 +27,7 @@ export default function CartPage() {
   const [orderData, setOrderData] = useState(null)
   const [pickupPoints, setPickupPoints] = useState([])
   const [stockByStore, setStockByStore] = useState({})
+  const [stockLoaded, setStockLoaded] = useState(false)
   const paymentContainerRef = useRef(null)
   const integrationLoadedRef = useRef(false)
 
@@ -139,27 +140,29 @@ export default function CartPage() {
     
     // Загружаем остатки по складам
     fetch('/api/pickup-points/stock')
-      .then((res) => res.ok ? res.json() : {})
-      .then((data) => { if (!cancelled) setStockByStore(data || {}) })
-      .catch(() => { if (!cancelled) setStockByStore({}) })
+      .then((res) => res.ok ? res.json() : { loaded: false, data: {} })
+      .then((result) => {
+        if (!cancelled) {
+          setStockByStore(result.data || {})
+          setStockLoaded(result.loaded === true)
+        }
+      })
+      .catch(() => { if (!cancelled) { setStockByStore({}); setStockLoaded(false) } })
     
     return () => { cancelled = true }
   }, [showCheckout])
 
   // Пункты выдачи с остатками — скрываем те, где нет товаров из корзины
-  const stockDataAvailable = Object.keys(stockByStore).length > 0
   const availablePickupPoints = pickupPoints.filter(point => {
     // Если у пункта нет привязки к складу — показываем всегда
     if (!point.store_id) return true
-    // Если данные об остатках ещё не загружены / API недоступен — показываем (fail-open)
-    if (!stockDataAvailable) return true
+    // Если API остатков не загрузился (ошибка/недоступен) — показываем всё (fail-open)
+    if (!stockLoaded) return true
     const storeStock = stockByStore[point.store_id]
-    // Если для этого склада нет данных в ответе API — показываем (склад может быть не в отчёте)
-    if (storeStock === undefined) return true
-    // Если склад есть в отчёте, но совсем пустой — скрываем
-    if (storeStock.length === 0) return false
-    // Если корзина пуста — показываем все пункты
-    if (cart.length === 0) return true
+    // Если склад есть в ответе, но массив пустой или все stock <= 0 — скрываем
+    if (!storeStock || storeStock.length === 0) return false
+    // Если корзина пуста — показываем только пункты, где хоть что-то есть
+    if (cart.length === 0) return storeStock.some(s => s.stock > 0)
     // Проверяем, есть ли хотя бы один товар из корзины на этом складе
     return cart.some(cartItem => {
       const cartName = (cartItem.name || '').trim().toLowerCase()

@@ -6,7 +6,8 @@ import '../styles/profile.css';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, logout, loading: authLoading } = useAuth();
+  const { user, isAuthenticated, isAdmin, checkAdmin, logout, loading: authLoading } = useAuth();
+  const [showAdminLink, setShowAdminLink] = useState(false);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -14,6 +15,15 @@ export default function ProfilePage() {
     // Загружаем заказы пользователя из БД
     loadOrders();
   }, [user?.id]);
+
+  // Проверяем права админа
+  useEffect(() => {
+    if (isAdmin) {
+      setShowAdminLink(true);
+    } else if (isAuthenticated) {
+      checkAdmin().then(result => setShowAdminLink(result));
+    }
+  }, [isAuthenticated, isAdmin]);
 
   const loadOrders = async () => {
     if (!user?.id) {
@@ -138,6 +148,14 @@ export default function ProfilePage() {
             Выйти
           </button>
         </div>
+
+        {showAdminLink && (
+          <div className="profile-admin-link">
+            <Link to="/admin" className="btn-admin">
+              ⚙️ Админ-панель
+            </Link>
+          </div>
+        )}
 
         <div className="profile-content">
           <div className="orders-section">

@@ -48,6 +48,11 @@ export default function Admin() {
     is_active: true
   })
 
+  // Состояние для управления пользователями
+  const [users, setUsers] = useState([])
+  const [usersLoading, setUsersLoading] = useState(false)
+  const [showUsersSection, setShowUsersSection] = useState(false)
+
   // Проверка доступа при загрузке
   useEffect(() => {
     const verifyAccess = async () => {
@@ -96,6 +101,45 @@ export default function Admin() {
       console.error('Ошибка загрузки складов:', error)
     } finally {
       setStoresLoading(false)
+    }
+  }
+
+  // Загрузка пользователей
+  const loadUsers = async () => {
+    setUsersLoading(true)
+    try {
+      const response = await fetch('/api/admin/users', { headers: getAuthHeaders() })
+      if (response.ok) {
+        const data = await response.json()
+        setUsers(Array.isArray(data) ? data : [])
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки пользователей:', error)
+    } finally {
+      setUsersLoading(false)
+    }
+  }
+
+  // Переключение прав админа
+  const handleToggleAdmin = async (userId, currentIsAdmin) => {
+    const action = currentIsAdmin ? 'снять права админа' : 'назначить админом'
+    if (!confirm(`Вы уверены, что хотите ${action} у пользователя #${userId}?`)) return
+    
+    try {
+      const response = await fetch(`/api/admin/users/${userId}/set-admin`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ isAdmin: !currentIsAdmin })
+      })
+      if (response.ok) {
+        setUsers(prev => prev.map(u => u.id === userId ? { ...u, is_admin: !currentIsAdmin } : u))
+      } else {
+        const data = await response.json()
+        alert(data.error || 'Ошибка изменения прав')
+      }
+    } catch (error) {
+      console.error('Ошибка:', error)
+      alert('Ошибка изменения прав')
     }
   }
 
@@ -697,6 +741,70 @@ export default function Admin() {
               ))
             )}
           </div>
+        </div>
+
+        {/* Секция управления пользователями */}
+        <div className="admin-card users-section">
+          <div className="markers-header">
+            <h2>👥 Пользователи</h2>
+            <button
+              className="btn-primary"
+              onClick={() => { setShowUsersSection(!showUsersSection); if (!showUsersSection && users.length === 0) loadUsers() }}
+            >
+              {showUsersSection ? '✕ Скрыть' : '👁 Показать'}
+            </button>
+          </div>
+
+          {showUsersSection && (
+            <div className="users-list">
+              {usersLoading ? (
+                <p>Загрузка пользователей...</p>
+              ) : users.length === 0 ? (
+                <p className="no-markers">Пользователей пока нет</p>
+              ) : (
+                <>
+                  <p className="section-hint" style={{ marginBottom: '16px' }}>
+                    Всего: {users.length} | Админов: {users.filter(u => u.is_admin).length}
+                  </p>
+                  {users.map(u => (
+                    <div key={u.id} className={`user-item ${u.is_admin ? 'user-item--admin' : ''}`}>
+                      <div className="user-info">
+                        <div className="user-avatar">
+                          {u.photo_url ? (
+                            <img src={u.photo_url} alt={u.first_name} />
+                          ) : (
+                            <span>{u.first_name?.[0] || '?'}</span>
+                          )}
+                        </div>
+                        <div className="user-details">
+                          <strong>{u.first_name || ''} {u.last_name || ''}</strong>
+                          <div className="user-meta">
+                            {u.email && <span>📧 {u.email}</span>}
+                            {u.phone && <span>📱 {u.phone}</span>}
+                            {u.username && <span>@{u.username}</span>}
+                            {u.telegram_id && <span>TG: {u.telegram_id}</span>}
+                          </div>
+                          <div className="user-meta">
+                            <span>ID: {u.id}</span>
+                            {u.created_at && <span>{new Date(u.created_at).toLocaleDateString('ru-RU')}</span>}
+                            {u.is_admin && <span className="admin-badge">ADMIN</span>}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="user-actions">
+                        <button
+                          className={u.is_admin ? 'btn-revoke' : 'btn-grant'}
+                          onClick={() => handleToggleAdmin(u.id, u.is_admin)}
+                        >
+                          {u.is_admin ? '🚫 Снять админа' : '👑 Назначить'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

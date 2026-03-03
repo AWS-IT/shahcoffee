@@ -13,6 +13,8 @@ import {
   createUserWithEmail,
   linkTelegramToUser,
   isUserAdmin,
+  setUserAdmin,
+  getAllUsers,
   createOrder, 
   updateOrderStatus, 
   getOrderById, 
@@ -1199,7 +1201,8 @@ app.post('/api/auth/register', async (req, res) => {
         id: user.id,
         email: user.email,
         first_name: user.first_name,
-        phone: user.phone
+        phone: user.phone,
+        is_admin: user.is_admin === 1
       }
     });
   } catch (error) {
@@ -1655,35 +1658,92 @@ app.delete('/api/admin/pickup-points/:id', requireAdmin, async (req, res) => {
 
 // ========== END PICKUP POINTS ==========
 
+// ========== ADMIN: УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЯМИ ==========
+
+// Получить список всех пользователей
+app.get('/api/admin/users', requireAdmin, async (req, res) => {
+  try {
+    const users = await getAllUsers();
+    res.json(users.map(u => ({
+      id: u.id,
+      email: u.email,
+      first_name: u.first_name,
+      last_name: u.last_name,
+      username: u.username,
+      phone: u.phone,
+      photo_url: u.photo_url,
+      telegram_id: u.telegram_id,
+      is_admin: u.is_admin === 1,
+      created_at: u.created_at
+    })));
+  } catch (error) {
+    console.error('❌ Ошибка загрузки пользователей:', error);
+    res.status(500).json({ error: 'Failed to load users' });
+  }
+});
+
+// Назначить/снять права админа
+app.post('/api/admin/users/:id/set-admin', requireAdmin, async (req, res) => {
+  try {
+    const userId = parseInt(req.params.id);
+    const { isAdmin } = req.body;
+    
+    if (typeof isAdmin !== 'boolean') {
+      return res.status(400).json({ error: 'Поле isAdmin должно быть boolean' });
+    }
+    
+    await setUserAdmin(userId, isAdmin);
+    console.log(`✓ Пользователь ${userId}: is_admin = ${isAdmin}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Ошибка изменения прав:', error);
+    res.status(500).json({ error: 'Failed to update admin status' });
+  }
+});
+
+// ========== END ADMIN USERS ==========
+
 // Получить остатки товаров на складах пунктов выдачи (публичный)
 app.get('/api/pickup-points/stock', async (req, res) => {
   if (!PUBLIC_TOKEN) {
-    return res.json({});
+    return res.json({ loaded: false, data: {} });
   }
   try {
     // Получаем все пункты выдачи с привязкой к складу
     const points = await getPickupPoints();
     const storeIds = points.filter(p => p.store_id).map(p => p.store_id);
-    if (storeIds.length === 0) return res.json({});
+    if (storeIds.length === 0) return res.json({ loaded: true, data: {} });
 
-    // Запрашиваем остатки из МойСклад
-    const stockUrl = `${ADMIN_API_URL}/api/remap/1.2/report/stock/all?limit=1000&groupBy=store`;
-    const stockResponse = await fetch(stockUrl, {
-      headers: { 'Authorization': `Bearer ${PUBLIC_TOKEN}`, 'Content-Type': 'application/json' },
-    });
-    if (!stockResponse.ok) {
-      console.warn('МойСклад stock API ошибка:', stockResponse.status);
-      return res.json({});
+    // Запрашиваем остатки из МойСклад (с пагинацией)
+    let allRows = [];
+    let offset = 0;
+    const limit = 1000;
+    while (true) {
+      const stockUrl = `${ADMIN_API_URL}/api/remap/1.2/report/stock/all?limit=${limit}&offset=${offset}&groupBy=store`;
+      const stockResponse = await fetch(stockUrl, {
+        headers: { 'Authorization': `Bearer ${PUBLIC_TOKEN}`, 'Content-Type': 'application/json' },
+      });
+      if (!stockResponse.ok) {
+        console.warn('МойСклад stock API ошибка:', stockResponse.status);
+        return res.json({ loaded: false, data: {} });
+      }
+      const stockData = await stockResponse.json();
+      const rows = stockData.rows || [];
+      allRows = allRows.concat(rows);
+      if (rows.length < limit) break;
+      offset += limit;
     }
-    const stockData = await stockResponse.json();
     
-    // Группируем остатки по складам: { storeId: [{ productId, name, stock }] }
+    // Группируем остатки по складам
     const stockByStore = {};
-    for (const row of (stockData.rows || [])) {
+    // Инициализируем все привязанные склады пустым массивом — так фронт знает:  «мы проверили этот склад, товаров нет»
+    for (const sid of storeIds) {
+      stockByStore[sid] = [];
+    }
+    for (const row of allRows) {
       const storeHref = row.store?.meta?.href || '';
       const storeId = storeHref.split('/').pop();
       if (!storeIds.includes(storeId)) continue;
-      if (!stockByStore[storeId]) stockByStore[storeId] = [];
       stockByStore[storeId].push({
         productId: (row.meta?.href || '').split('/').pop() || null,
         name: row.name,
@@ -1692,11 +1752,11 @@ app.get('/api/pickup-points/stock', async (req, res) => {
       });
     }
 
-    console.log(`📦 Остатки по складам: ${Object.keys(stockByStore).length} складов`);
-    res.json(stockByStore);
+    console.log(`📦 Остатки по складам: ${Object.keys(stockByStore).length} складов, ${allRows.length} строк`);
+    res.json({ loaded: true, data: stockByStore });
   } catch (error) {
     console.error('❌ Ошибка получения остатков:', error.message);
-    res.json({});
+    res.json({ loaded: false, data: {} });
   }
 });
 

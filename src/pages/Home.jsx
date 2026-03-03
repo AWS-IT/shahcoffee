@@ -9,11 +9,10 @@ export default function Home() {
   return (
     <>
       <Hero />
-      <About id="about" />
-      <section id="dvs"><HomeMap /></section>
       <section id="catalog"><CatalogPreview /></section>
-      <DeliverySection/>
-      {/*<ConstructorPromo id="constructor" />*/}
+      <section id="dvs"><HomeMap /></section>
+      <About id="about" />
+      <DeliverySection />
     </>
   );
 }

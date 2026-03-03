@@ -34,9 +34,9 @@ export default function Header({ isHome }) {
   const closeMenu = () => setIsMenuOpen(false)
 
   const menuItems = [
-    { label: 'О нас', to: '/about', scroll: 'about' },
-    { label: 'Карта продаж', to: '/', scroll: 'dvs' },
     { label: 'Каталог', to: '/catalog', scroll: 'catalog' },
+    { label: 'Карта продаж', to: '/', scroll: 'dvs' },
+    { label: 'О нас', to: '/about', scroll: 'about' },
     { label: 'Контакты', to: '/', scroll: 'footer' },
   ]
 

@@ -335,6 +335,14 @@ export async function setUserAdmin(userId, isAdmin = true) {
   );
 }
 
+// Получить всех пользователей (для админки)
+export async function getAllUsers() {
+  const [rows] = await pool.query(
+    'SELECT id, email, first_name, last_name, username, phone, photo_url, telegram_id, is_admin, created_at FROM users ORDER BY created_at DESC'
+  );
+  return rows;
+}
+
 // ==================== ЗАКАЗЫ ====================
 
 // Создать заказ
