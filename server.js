@@ -1745,7 +1745,7 @@ app.get('/api/pickup-points/stock', async (req, res) => {
       const storeId = storeHref.split('/').pop();
       if (!storeIds.includes(storeId)) continue;
       stockByStore[storeId].push({
-        productId: (row.meta?.href || '').split('/').pop() || null,
+        productId: (row.assortment?.meta?.href || '').split('/').pop() || null,
         name: row.name,
         stock: row.stock || 0,
         code: row.code || null,
