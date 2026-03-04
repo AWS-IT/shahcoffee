@@ -15,6 +15,8 @@ import OrderPage from './pages/OrderPage.jsx'
 import ProfilePage from './pages/ProfilePage.jsx'
 import LoginPage from './pages/LoginPage.jsx'
 import Admin from './pages/Admin.jsx'
+import ServicePage from './pages/ServicePage.jsx'
+import ServiceCheckoutPage from './pages/ServiceCheckoutPage.jsx'
 
 function AppContent() {
   const location = useLocation()
@@ -63,6 +65,8 @@ function AppContent() {
           <Route path="/catalog" element={<CatalogPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/product/:id" element={<ProductPage />} />
+          <Route path="/service/:id" element={<ServicePage />} />
+          <Route path="/service-checkout/:id" element={<ServiceCheckoutPage />} />
           <Route path="*" element={<h1 style={{padding: '100px', textAlign: 'center'}}>404 — Страница не найдена</h1>} />
         </Routes>
       </main>

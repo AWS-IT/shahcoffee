@@ -758,17 +758,20 @@ async function createMoySkladShipment(orderId, orderData) {
     }
     
     // 4. Формируем позиции для отгрузки
-    const positions = items.map((item) => ({
-      quantity: item.quantity,
-      price: item.priceRub * 100, // МойСклад хранит цены в копейках
-      assortment: {
-        meta: {
-          href: `${ADMIN_API_URL}/api/remap/1.2/entity/product/${item.id}`,
-          type: 'product',
-          mediaType: 'application/json'
+    const positions = items.map((item) => {
+      const entityType = item.entityType || 'product'; // 'product' или 'service'
+      return {
+        quantity: item.quantity,
+        price: item.priceRub * 100, // МойСклад хранит цены в копейках
+        assortment: {
+          meta: {
+            href: `${ADMIN_API_URL}/api/remap/1.2/entity/${entityType}/${item.id}`,
+            type: entityType,
+            mediaType: 'application/json'
+          }
         }
-      }
-    }));
+      };
+    });
     
     // 5. Создаем отгрузку
     const shipmentPayload = {
@@ -1457,6 +1460,70 @@ app.get('/api/admin/stores', requireAdmin, async (req, res) => {
   } catch (error) {
     console.error('❌ Ошибка получения складов:', error);
     res.status(500).json({ error: 'Failed to get stores' });
+  }
+});
+
+// ==================== API УСЛУГ (СЕРВИСЫ) ====================
+
+// Получить список услуг из МойСклад (для админки - выбор услуги для главной)
+app.get('/api/admin/services', requireAdmin, async (req, res) => {
+  try {
+    const url = `${ADMIN_API_URL}/api/remap/1.2/entity/service?limit=100`;
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${PUBLIC_TOKEN}`,
+        'Content-Type': 'application/json',
+      }
+    });
+    if (!response.ok) throw new Error(`MoySklad error: ${response.status}`);
+    const data = await response.json();
+    const services = (data.rows || []).map(s => {
+      const price = s.salePrices?.find(p => p.priceType?.name === 'Цена продажи');
+      return {
+        id: s.id,
+        name: s.name,
+        code: s.code || '',
+        description: s.description || '',
+        price: price ? price.value / 100 : 0,
+      };
+    });
+    console.log(`🛎️ Получено услуг: ${services.length}`);
+    res.json(services);
+  } catch (error) {
+    console.error('❌ Ошибка получения услуг:', error);
+    res.status(500).json({ error: 'Failed to get services' });
+  }
+});
+
+// Получить выбранную услугу для главной страницы (публичный)
+app.get('/api/hero-service', async (req, res) => {
+  try {
+    const serviceId = await getSetting('hero_service_id');
+    if (!serviceId) return res.json({ service: null });
+
+    const url = `${ADMIN_API_URL}/api/remap/1.2/entity/service/${serviceId}?expand=images`;
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${PUBLIC_TOKEN}`,
+        'Content-Type': 'application/json',
+      }
+    });
+    if (!response.ok) return res.json({ service: null });
+    const s = await response.json();
+    const price = s.salePrices?.find(p => p.priceType?.name === 'Цена продажи');
+    res.json({
+      service: {
+        id: s.id,
+        name: s.name,
+        code: s.code || '',
+        description: s.description || '',
+        price: price ? price.value / 100 : 0,
+        images: (s.images?.rows || []).map(img => img.meta?.downloadHref || img.miniature?.downloadHref || img.tiny?.href).filter(Boolean),
+      }
+    });
+  } catch (error) {
+    console.error('❌ Ошибка получения услуги для главной:', error);
+    res.json({ service: null });
   }
 });
 

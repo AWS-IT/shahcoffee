@@ -53,6 +53,12 @@ export default function Admin() {
   const [usersLoading, setUsersLoading] = useState(false)
   const [showUsersSection, setShowUsersSection] = useState(false)
 
+  // Состояние для услуги на главной
+  const [services, setServices] = useState([])
+  const [selectedService, setSelectedService] = useState('')
+  const [servicesLoading, setServicesLoading] = useState(false)
+  const [serviceSaving, setServiceSaving] = useState(false)
+
   // Проверка доступа при загрузке
   useEffect(() => {
     const verifyAccess = async () => {
@@ -78,6 +84,8 @@ export default function Admin() {
       loadStores()
       loadSelectedStore()
       loadPickupPoints()
+      loadServices()
+      loadSelectedService()
     }
   }, [hasAccess])
 
@@ -173,6 +181,57 @@ export default function Admin() {
       console.error('Ошибка сохранения склада:', error)
     } finally {
       setStoreSaving(false)
+    }
+  }
+
+  // Загрузка списка услуг из МойСклад
+  const loadServices = async () => {
+    setServicesLoading(true)
+    try {
+      const response = await fetch('/api/admin/services', {
+        headers: getAuthHeaders()
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setServices(data)
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки услуг:', error)
+    } finally {
+      setServicesLoading(false)
+    }
+  }
+
+  // Загрузка текущей выбранной услуги для главной
+  const loadSelectedService = async () => {
+    try {
+      const response = await fetch('/api/settings/hero_service_id')
+      const data = await response.json()
+      if (data.value) {
+        setSelectedService(data.value)
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки настройки услуги:', error)
+    }
+  }
+
+  // Сохранение выбранной услуги для главной
+  const handleServiceChange = async (serviceId) => {
+    setSelectedService(serviceId)
+    setServiceSaving(true)
+    try {
+      const response = await fetch('/api/admin/settings/hero_service_id', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ value: serviceId })
+      })
+      if (response.ok) {
+        console.log('✓ Услуга для главной сохранена')
+      }
+    } catch (error) {
+      console.error('Ошибка сохранения услуги:', error)
+    } finally {
+      setServiceSaving(false)
     }
   }
 
@@ -445,6 +504,35 @@ export default function Admin() {
               </select>
               {storeSaving && <span className="saving-indicator">💾 Сохранение...</span>}
               {selectedStore && !storeSaving && <span className="saved-indicator">✅ Сохранено</span>}
+            </div>
+          )}
+        </div>
+
+        {/* Секция выбора услуги для главной */}
+        <div className="admin-card stores-section">
+          <h2>🛎️ Услуга на главной странице</h2>
+          <p className="section-hint">Выбранная услуга будет отображаться на главной странице как промо-блок</p>
+          
+          {servicesLoading ? (
+            <p>Загрузка услуг...</p>
+          ) : services.length === 0 ? (
+            <p className="no-stores">Услуги не найдены в МойСклад</p>
+          ) : (
+            <div className="store-selector">
+              <select 
+                value={selectedService} 
+                onChange={(e) => handleServiceChange(e.target.value)}
+                disabled={serviceSaving}
+              >
+                <option value="">-- Не отображать --</option>
+                {services.map(svc => (
+                  <option key={svc.id} value={svc.id}>
+                    {svc.name} — {svc.price.toLocaleString('ru-RU')} ₽
+                  </option>
+                ))}
+              </select>
+              {serviceSaving && <span className="saving-indicator">💾 Сохранение...</span>}
+              {selectedService && !serviceSaving && <span className="saved-indicator">✅ Сохранено</span>}
             </div>
           )}
         </div>
