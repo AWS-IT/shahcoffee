@@ -5,6 +5,9 @@ const SLIDES = [
   // Добавляй новые слайды сюда:
   { src: '/main_photos/promo2.jpg', alt: 'Промо 2' },
   { src: '/main_photos/promo3.jpg', alt: 'Промо 3' },
+  { src: '/main_photos/promo4.jpg', alt: 'Промо 4' },
+  { src: '/main_photos/promo5.jpg', alt: 'Промо 5' },
+  { src: '/main_photos/promo6.jpg', alt: 'Промо 6' },
 ];
 
 const AUTO_SCROLL_INTERVAL = 5000; // 5 секунд
