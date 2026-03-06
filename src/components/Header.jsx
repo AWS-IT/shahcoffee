@@ -45,7 +45,16 @@ export default function Header({ isHome }) {
       <header className="header">
         <div className="container">
           <div className="header__inner">
-            <NavLink to="/" className="header__logo">
+            <NavLink
+              to="/"
+              className="header__logo"
+              onClick={(e) => {
+                if (window.location.pathname === '/') {
+                  e.preventDefault();
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              }}
+            >
               ШАХ
             </NavLink>
 
