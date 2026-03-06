@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom';
 const SLIDES = [
   { src: '/main_photos/photomain.jpg', alt: 'ШАХ — брендированные стаканчики' },
   { src: '/main_photos/promo2.jpg', alt: 'Промо 2' },
-  { src: '/main_photos/promo3.jpg', alt: 'Промо 3' },
   { src: '/main_photos/promo4.jpg', alt: 'Промо 4' },
   { src: '/main_photos/promo5.jpg', alt: 'Промо 5' },
   { src: '/main_photos/promo6.jpg', alt: 'Промо 6' },

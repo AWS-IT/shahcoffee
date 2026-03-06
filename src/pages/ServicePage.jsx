@@ -7,6 +7,7 @@ export default function ServicePage() {
   const navigate = useNavigate()
   const [service, setService] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [quantity, setQuantity] = useState(1)
 
   useEffect(() => {
     const loadService = async () => {
@@ -72,6 +73,19 @@ export default function ServicePage() {
 
             <div className="service-page__price-block">
               <span className="service-page__price">{priceRub.toLocaleString('ru-RU')} ₽</span>
+              <span className="service-page__price-unit">/ за 1 ед.</span>
+            </div>
+
+            <div className="service-page__quantity">
+              <label>Количество:</label>
+              <div className="quantity-block">
+                <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="qty-btn">−</button>
+                <span className="qty-value">{quantity}</span>
+                <button onClick={() => setQuantity(q => q + 1)} className="qty-btn">+</button>
+              </div>
+              <div className="service-page__total">
+                Итого: <strong>{(priceRub * quantity).toLocaleString('ru-RU')} ₽</strong>
+              </div>
             </div>
 
             <div className="service-page__features">
@@ -107,7 +121,7 @@ export default function ServicePage() {
 
             <button
               className="btn-primary btn-lg service-page__order-btn"
-              onClick={() => navigate(`/service-checkout/${id}`)}
+              onClick={() => navigate(`/service-checkout/${id}?qty=${quantity}`)}
             >
               Заказать услугу
             </button>

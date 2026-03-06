@@ -1,6 +1,6 @@
 // src/pages/ServiceCheckoutPage.jsx
 import React, { useState, useEffect, useRef } from 'react'
-import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 
 const TBANK_TERMINAL_KEY = '1769767428904'
@@ -10,6 +10,11 @@ export default function ServiceCheckoutPage() {
   const navigate = useNavigate()
   const { user, isAuthenticated } = useAuth()
 
+  const [searchParams] = useSearchParams()
+  const [quantity, setQuantity] = useState(() => {
+    const q = parseInt(searchParams.get('qty'), 10)
+    return q > 0 ? q : 1
+  })
   const [service, setService] = useState(null)
   const [loading, setLoading] = useState(true)
   const [formData, setFormData] = useState({
@@ -56,6 +61,8 @@ export default function ServiceCheckoutPage() {
     const entry = service.salePrices?.find(p => p.priceType?.name === 'Цена продажи')
     return entry ? entry.value / 100 : 0
   })()
+
+  const totalPrice = priceRub * quantity
 
   // T-Bank виджет
   useEffect(() => {
@@ -167,7 +174,7 @@ export default function ServiceCheckoutPage() {
         name: service.name,
         code: service.code || null,
         priceRub,
-        quantity: 1,
+        quantity,
         entityType: 'service',
         image: null,
       }]
@@ -182,7 +189,7 @@ export default function ServiceCheckoutPage() {
         customerData,
         coordinates: null,
         items,
-        totalPrice: priceRub,
+        totalPrice,
         createdAt: new Date().toISOString(),
       }
       setOrderData(orderInfo)
@@ -197,7 +204,7 @@ export default function ServiceCheckoutPage() {
           customerData,
           coordinates: null,
           items,
-          totalPrice: priceRub,
+          totalPrice,
         })
       })
 
@@ -337,7 +344,7 @@ export default function ServiceCheckoutPage() {
                 <h2>Оплата услуги</h2>
                 <p className="payment-info">
                   Заказ #{orderData?.orderId}<br />
-                  Сумма: <strong>{priceRub.toLocaleString('ru-RU')} ₽</strong>
+                  Сумма: <strong>{totalPrice.toLocaleString('ru-RU')} ₽</strong>
                 </p>
 
                 {error && <div className="error-message">{error}</div>}
@@ -412,14 +419,20 @@ export default function ServiceCheckoutPage() {
               <div className="order-item">
                 <div className="order-item__info">
                   <p className="order-item__name">{service.name}</p>
-                  <p className="order-item__quantity">Кол-во: 1</p>
+                  <p className="order-item__quantity">Кол-во: {quantity}</p>
+                  <p className="order-item__unit-price">{priceRub.toLocaleString('ru-RU')} ₽ × {quantity}</p>
                 </div>
-                <p className="order-item__price">{priceRub.toLocaleString('ru-RU')} ₽</p>
+                <p className="order-item__price">{totalPrice.toLocaleString('ru-RU')} ₽</p>
               </div>
+            </div>
+            <div className="service-checkout__qty-change">
+              <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="qty-btn" disabled={showPaymentButtons}>−</button>
+              <span className="qty-value">{quantity}</span>
+              <button onClick={() => setQuantity(q => q + 1)} className="qty-btn" disabled={showPaymentButtons}>+</button>
             </div>
             <div className="order-total">
               <h3>Итого к оплате:</h3>
-              <p className="total-price">{priceRub.toLocaleString('ru-RU')} ₽</p>
+              <p className="total-price">{totalPrice.toLocaleString('ru-RU')} ₽</p>
             </div>
           </div>
         </div>

@@ -2964,13 +2964,40 @@ body.menu-open {
 }
 
 .service-page__price-block {
-  margin-bottom: 24px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }
 
 .service-page__price {
   font-size: 30px;
   font-weight: 800;
   color: #e31937;
+}
+
+.service-page__price-unit {
+  font-size: 15px;
+  color: #888;
+  font-weight: 400;
+}
+
+.service-page__quantity {
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  label {
+    font-size: 15px;
+    font-weight: 600;
+    color: #333;
+  }
+}
+
+.service-page__total {
+  font-size: 20px;
+  color: #1a1a2e;
 }
 
 .service-page__features {
@@ -3113,4 +3140,14 @@ body.menu-open {
   color: #2a5a8a;
   line-height: 1.5;
   margin-bottom: 20px;
+}
+
+.service-checkout__qty-change {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  padding: 12px 0;
+  border-top: 1px solid #eee;
+  margin-top: 12px;
 }
