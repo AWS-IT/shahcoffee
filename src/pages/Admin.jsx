@@ -22,7 +22,9 @@ export default function Admin() {
     lat: '',
     lon: '',
     icon_color: 'red',
-    is_active: true
+    is_active: true,
+    photo_url: '',
+    info: '',
   })
 
   // Состояние для складов
@@ -52,6 +54,10 @@ export default function Admin() {
   const [users, setUsers] = useState([])
   const [usersLoading, setUsersLoading] = useState(false)
   const [showUsersSection, setShowUsersSection] = useState(false)
+
+  // Состояние для комментария кофеен
+  const [coffeeComment, setCoffeeComment] = useState('')
+  const [coffeeCommentSaving, setCoffeeCommentSaving] = useState(false)
 
   // Состояние для услуги на главной
   const [services, setServices] = useState([])
@@ -86,6 +92,7 @@ export default function Admin() {
       loadPickupPoints()
       loadServices()
       loadSelectedService()
+      loadCoffeeComment()
     }
   }, [hasAccess])
 
@@ -235,6 +242,33 @@ export default function Admin() {
     }
   }
 
+  // Загрузка комментария кофеен
+  const loadCoffeeComment = async () => {
+    try {
+      const response = await fetch('/api/settings/coffee_shops_comment')
+      const data = await response.json()
+      if (data.value) setCoffeeComment(data.value)
+    } catch (error) {
+      console.error('Ошибка загрузки комментария кофеен:', error)
+    }
+  }
+
+  // Сохранение комментария кофеен
+  const handleCoffeeCommentSave = async () => {
+    setCoffeeCommentSaving(true)
+    try {
+      await fetch('/api/admin/settings/coffee_shops_comment', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ value: coffeeComment })
+      })
+    } catch (error) {
+      console.error('Ошибка сохранения:', error)
+    } finally {
+      setCoffeeCommentSaving(false)
+    }
+  }
+
   const loadMarkers = async () => {
     setMarkersLoading(true)
     try {
@@ -308,7 +342,9 @@ export default function Admin() {
       lat: '',
       lon: '',
       icon_color: 'red',
-      is_active: true
+      is_active: true,
+      photo_url: '',
+      info: '',
     })
     setAddressInput('')
     setEditingMarker(null)
@@ -355,7 +391,9 @@ export default function Admin() {
       lat: marker.lat,
       lon: marker.lon,
       icon_color: marker.icon_color || 'red',
-      is_active: marker.is_active
+      is_active: marker.is_active,
+      photo_url: marker.photo_url || '',
+      info: marker.info || '',
     })
     setAddressInput(marker.address || '')
     setEditingMarker(marker)
@@ -537,6 +575,30 @@ export default function Admin() {
           )}
         </div>
 
+        {/* Комментарий для кофеен на карте */}
+        <div className="admin-card stores-section">
+          <h2>☕ Комментарий кофеен на карте</h2>
+          <p className="section-hint">Отображается под картой рядом со счётчиком красных точек (кофеен)</p>
+          <div className="store-selector" style={{display:'flex',gap:'10px',alignItems:'center'}}>
+            <input
+              type="text"
+              value={coffeeComment}
+              onChange={(e) => setCoffeeComment(e.target.value)}
+              placeholder="Например: Продаж за месяц: 50"
+              style={{flex:1,padding:'10px 14px',borderRadius:'10px',border:'1px solid #ddd',fontSize:'15px'}}
+            />
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={handleCoffeeCommentSave}
+              disabled={coffeeCommentSaving}
+              style={{whiteSpace:'nowrap'}}
+            >
+              {coffeeCommentSaving ? '💾...' : 'Сохранить'}
+            </button>
+          </div>
+        </div>
+
         <div className="admin-card markers-section">
           <div className="markers-header">
             <h2>📍 Метки на карте</h2>
@@ -570,6 +632,29 @@ export default function Admin() {
                     onChange={(e) => setMarkerForm({...markerForm, description: e.target.value})}
                     placeholder="Описание, которое появится при клике на метку"
                     rows={3}
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label>URL фотографии</label>
+                  <input
+                    type="text"
+                    value={markerForm.photo_url}
+                    onChange={(e) => setMarkerForm({...markerForm, photo_url: e.target.value})}
+                    placeholder="https://example.com/photo.jpg"
+                  />
+                  {markerForm.photo_url && (
+                    <img src={markerForm.photo_url} alt="Превью" style={{maxWidth:'200px',maxHeight:'120px',marginTop:'8px',borderRadius:'8px',objectFit:'cover'}} />
+                  )}
+                </div>
+
+                <div className="form-group">
+                  <label>Доп. информация (стаканчики, продажи и т.д.)</label>
+                  <input
+                    type="text"
+                    value={markerForm.info}
+                    onChange={(e) => setMarkerForm({...markerForm, info: e.target.value})}
+                    placeholder="Например: Стаканчиков в месяц: 500"
                   />
                 </div>
 

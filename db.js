@@ -135,6 +135,16 @@ export async function initDatabase() {
       // Колонка уже существует — игнорируем
     }
 
+    // Миграция: добавляем photo_url и info в map_markers
+    try {
+      await connection.query(`ALTER TABLE map_markers ADD COLUMN photo_url TEXT DEFAULT NULL`);
+      console.log('✓ Добавлена колонка photo_url в map_markers');
+    } catch (e) {}
+    try {
+      await connection.query(`ALTER TABLE map_markers ADD COLUMN info TEXT DEFAULT NULL`);
+      console.log('✓ Добавлена колонка info в map_markers');
+    } catch (e) {}
+
     // Авто-сидирование: добавляем пункты выдачи по умолчанию если таблица пуста
     const [existingPoints] = await connection.query('SELECT COUNT(*) as cnt FROM pickup_points');
     if (existingPoints[0].cnt === 0) {
@@ -535,22 +545,22 @@ export async function getAllMapMarkers() {
 
 // Создать метку
 export async function createMapMarker(marker) {
-  const { title, description, address, lat, lon, icon_color } = marker;
+  const { title, description, address, lat, lon, icon_color, photo_url, info } = marker;
   const [result] = await pool.query(
-    `INSERT INTO map_markers (title, description, address, lat, lon, icon_color)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-    [title, description || '', address || '', lat, lon, icon_color || 'red']
+    `INSERT INTO map_markers (title, description, address, lat, lon, icon_color, photo_url, info)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    [title, description || '', address || '', lat, lon, icon_color || 'red', photo_url || null, info || null]
   );
   return { id: result.insertId, ...marker };
 }
 
 // Обновить метку
 export async function updateMapMarker(id, marker) {
-  const { title, description, address, lat, lon, icon_color, is_active } = marker;
+  const { title, description, address, lat, lon, icon_color, is_active, photo_url, info } = marker;
   await pool.query(
     `UPDATE map_markers SET title = ?, description = ?, address = ?, lat = ?, lon = ?, 
-     icon_color = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-    [title, description, address, lat, lon, icon_color, is_active, id]
+     icon_color = ?, is_active = ?, photo_url = ?, info = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [title, description, address, lat, lon, icon_color, is_active, photo_url || null, info || null, id]
   );
   return { id, ...marker };
 }

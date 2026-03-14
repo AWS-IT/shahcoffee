@@ -4,26 +4,32 @@ export default function HomeMap() {
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const [markers, setMarkers] = useState([]);
+  const [pickupPoints, setPickupPoints] = useState([]);
+  const [coffeeComment, setCoffeeComment] = useState('');
   const [ymapsReady, setYmapsReady] = useState(false);
 
-  // Загружаем метки с сервера
+  // Загружаем метки, пункты выдачи и настройку комментария
   useEffect(() => {
     fetch('/api/markers')
       .then(res => res.json())
-      .then(data => {
-        console.log('📍 Метки загружены:', data);
-        if (Array.isArray(data)) {
-          setMarkers(data);
-        }
-      })
+      .then(data => { if (Array.isArray(data)) setMarkers(data); })
       .catch(err => console.error('Ошибка загрузки меток:', err));
+
+    fetch('/api/pickup-points')
+      .then(res => res.json())
+      .then(data => { if (Array.isArray(data)) setPickupPoints(data.filter(p => p.is_active !== false)); })
+      .catch(err => console.error('Ошибка загрузки ПВЗ:', err));
+
+    fetch('/api/settings/coffee_shops_comment')
+      .then(res => res.json())
+      .then(data => { if (data.value) setCoffeeComment(data.value); })
+      .catch(() => {});
   }, []);
 
   // Загружаем Yandex Maps API
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    // Проверяем, загружен ли уже API
     if (window.ymaps) {
       window.ymaps.ready(() => setYmapsReady(true));
       return;
@@ -47,15 +53,17 @@ export default function HomeMap() {
     };
   }, []);
 
-  // Инициализируем карту и добавляем метки когда ОБА готовы
+  // Инициализируем карту когда всё готово
   useEffect(() => {
     if (!ymapsReady || !mapContainerRef.current) return;
     
-    // Создаём карту если её ещё нет
     if (!mapRef.current) {
-      // Центр карты - первая метка или Москва
-      const centerLat = markers[0]?.lat || 55.7558;
-      const centerLon = markers[0]?.lon || 37.6173;
+      const allPoints = [
+        ...markers.map(m => ({ lat: m.lat, lon: m.lon })),
+        ...pickupPoints.map(p => ({ lat: p.lat, lon: p.lon })),
+      ];
+      const centerLat = allPoints[0]?.lat || 55.7558;
+      const centerLon = allPoints[0]?.lon || 37.6173;
 
       const map = new window.ymaps.Map(mapContainerRef.current, {
         center: [parseFloat(centerLat), parseFloat(centerLon)],
@@ -64,19 +72,14 @@ export default function HomeMap() {
       });
 
       mapRef.current = map;
-      console.log('🗺️ Карта создана');
     }
     
-    // Добавляем метки
-    if (markers.length > 0) {
-      addMarkersToMap();
-    }
-  }, [ymapsReady, markers]);
+    addAllMarkers();
+  }, [ymapsReady, markers, pickupPoints]);
 
-  const addMarkersToMap = () => {
+  const addAllMarkers = () => {
     if (!mapRef.current || !window.ymaps) return;
 
-    // Очищаем старые метки
     mapRef.current.geoObjects.removeAll();
 
     const colorMap = {
@@ -88,15 +91,25 @@ export default function HomeMap() {
       yellow: 'islands#yellowIcon',
     };
 
+    // Красные/другие метки (кофейни и т.д.)
     markers.forEach(marker => {
+      const photoHtml = marker.photo_url
+        ? `<img src="${marker.photo_url}" alt="${marker.title}" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;margin-bottom:8px;" />`
+        : '';
+      const infoHtml = marker.info
+        ? `<p style="margin:6px 0 0;font-size:13px;color:#555;">☕ ${marker.info}</p>`
+        : '';
+
       const placemark = new window.ymaps.Placemark(
         [parseFloat(marker.lat), parseFloat(marker.lon)],
         {
           balloonContentHeader: `<strong>${marker.title}</strong>`,
           balloonContentBody: `
-            <div style="padding: 10px; font-family: Arial; font-size: 14px; max-width: 250px;">
-              ${marker.description ? `<p style="margin: 0 0 10px 0; color: #333;">${marker.description}</p>` : ''}
-              ${marker.address ? `<p style="margin: 0; color: #666; font-size: 12px;">📍 ${marker.address}</p>` : ''}
+            <div style="padding:8px;font-family:Arial;font-size:14px;max-width:260px;">
+              ${photoHtml}
+              ${marker.description ? `<p style="margin:0 0 8px;color:#333;">${marker.description}</p>` : ''}
+              ${marker.address ? `<p style="margin:0 0 4px;color:#666;font-size:12px;">\ud83d\udccd ${marker.address}</p>` : ''}
+              ${infoHtml}
             </div>
           `,
           hintContent: marker.title,
@@ -110,8 +123,36 @@ export default function HomeMap() {
       mapRef.current.geoObjects.add(placemark);
     });
 
-    // Если есть метки, центрируем карту на них
-    if (markers.length > 0) {
+    // Зелёные метки — пункты выдачи
+    pickupPoints.forEach(point => {
+      if (!point.lat || !point.lon) return;
+
+      const placemark = new window.ymaps.Placemark(
+        [parseFloat(point.lat), parseFloat(point.lon)],
+        {
+          balloonContentHeader: `<strong>\ud83d\udce6 ${point.name}</strong>`,
+          balloonContentBody: `
+            <div style="padding:8px;font-family:Arial;font-size:14px;max-width:260px;">
+              ${point.address ? `<p style="margin:0 0 6px;color:#666;font-size:12px;">\ud83d\udccd ${point.address}</p>` : ''}
+              ${point.description ? `<p style="margin:0 0 6px;color:#333;">${point.description}</p>` : ''}
+              ${point.working_hours ? `<p style="margin:0;color:#555;font-size:12px;">\ud83d\udd52 ${point.working_hours}</p>` : ''}
+              <p style="margin:6px 0 0;color:#2a7d2e;font-weight:600;font-size:13px;">\u2705 \u041f\u0443\u043d\u043a\u0442 \u0432\u044b\u0434\u0430\u0447\u0438</p>
+            </div>
+          `,
+          hintContent: point.name,
+        },
+        {
+          preset: 'islands#greenIcon',
+          balloonPanelMaxMapArea: 0,
+        }
+      );
+
+      mapRef.current.geoObjects.add(placemark);
+    });
+
+    // Центрируем карту
+    const totalObjects = markers.length + pickupPoints.filter(p => p.lat && p.lon).length;
+    if (totalObjects > 0) {
       mapRef.current.setBounds(mapRef.current.geoObjects.getBounds(), {
         checkZoomRange: true,
         zoomMargin: 50,
@@ -119,11 +160,14 @@ export default function HomeMap() {
     }
   };
 
+  const redCount = markers.filter(m => m.icon_color === 'red' || !m.icon_color).length;
+  const greenCount = pickupPoints.filter(p => p.lat && p.lon).length;
+
   return (
     <section className="home-map-section" id="dvs">
       <div className="container">
-        <h2 className="section-title">🗺️ Карта продаж</h2>
-        <p className="section-subtitle">Наши точки и места доставки</p>
+        <h2 className="section-title">\ud83d\uddfa\ufe0f \u041a\u0430\u0440\u0442\u0430 \u043f\u0440\u043e\u0434\u0430\u0436</h2>
+        <p className="section-subtitle">\u041d\u0430\u0448\u0438 \u0442\u043e\u0447\u043a\u0438 \u0438 \u043c\u0435\u0441\u0442\u0430 \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0438</p>
         
         <div 
           ref={mapContainerRef} 
@@ -136,6 +180,27 @@ export default function HomeMap() {
             background: '#f0f0f0',
           }}
         />
+
+        {/* Счётчики под картой */}
+        <div className="map-stats">
+          <div className="map-stats__item map-stats__item--green">
+            <span className="map-stats__dot map-stats__dot--green"></span>
+            <div>
+              <span className="map-stats__label">\u041f\u0443\u043d\u043a\u0442\u044b \u0432\u044b\u0434\u0430\u0447\u0438</span>
+              <span className="map-stats__count">{greenCount}</span>
+            </div>
+          </div>
+          <div className="map-stats__item map-stats__item--red">
+            <span className="map-stats__dot map-stats__dot--red"></span>
+            <div>
+              <span className="map-stats__label">\u041a\u043e\u0444\u0435\u0439\u043d\u0438</span>
+              <span className="map-stats__count">{redCount}</span>
+              {coffeeComment && (
+                <span className="map-stats__comment">{coffeeComment}</span>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       <style>{`
@@ -156,6 +221,59 @@ export default function HomeMap() {
           color: #8a7b6a;
           font-size: 16px;
           margin-bottom: 40px;
+        }
+
+        .map-stats {
+          display: flex;
+          justify-content: center;
+          gap: 32px;
+          margin-top: 24px;
+          flex-wrap: wrap;
+        }
+
+        .map-stats__item {
+          display: flex;
+          align-items: flex-start;
+          gap: 12px;
+          background: #fff;
+          border-radius: 14px;
+          padding: 16px 24px;
+          box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+          min-width: 180px;
+        }
+
+        .map-stats__dot {
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          flex-shrink: 0;
+          margin-top: 4px;
+        }
+        .map-stats__dot--green { background: #34a853; }
+        .map-stats__dot--red { background: #e31937; }
+
+        .map-stats__item > div {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .map-stats__label {
+          font-size: 14px;
+          color: #666;
+          font-weight: 500;
+        }
+
+        .map-stats__count {
+          font-size: 26px;
+          font-weight: 800;
+          color: #1a1a2e;
+          line-height: 1.2;
+        }
+
+        .map-stats__comment {
+          font-size: 13px;
+          color: #888;
+          margin-top: 2px;
         }
       `}</style>
     </section>

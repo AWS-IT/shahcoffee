@@ -1521,13 +1521,13 @@ app.get('/api/admin/markers', requireAdmin, async (req, res) => {
 // Создать метку (админка - требует админ права)
 app.post('/api/admin/markers', requireAdmin, async (req, res) => {
   try {
-    const { title, description, address, lat, lon, icon_color } = req.body;
+    const { title, description, address, lat, lon, icon_color, photo_url, info } = req.body;
     
     if (!title || !lat || !lon) {
       return res.status(400).json({ error: 'Title, lat and lon are required' });
     }
     
-    const marker = await createMapMarker({ title, description, address, lat, lon, icon_color });
+    const marker = await createMapMarker({ title, description, address, lat, lon, icon_color, photo_url, info });
     console.log('✓ Метка создана:', title);
     res.json(marker);
   } catch (error) {
@@ -1539,9 +1539,9 @@ app.post('/api/admin/markers', requireAdmin, async (req, res) => {
 // Обновить метку (админка - требует админ права)
 app.put('/api/admin/markers/:id', requireAdmin, async (req, res) => {
   try {
-    const { title, description, address, lat, lon, icon_color, is_active } = req.body;
+    const { title, description, address, lat, lon, icon_color, is_active, photo_url, info } = req.body;
     const marker = await updateMapMarker(req.params.id, { 
-      title, description, address, lat, lon, icon_color, is_active 
+      title, description, address, lat, lon, icon_color, is_active, photo_url, info 
     });
     console.log('✓ Метка обновлена:', title);
     res.json(marker);
