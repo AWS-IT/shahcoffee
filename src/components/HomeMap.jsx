@@ -88,7 +88,57 @@ export default function HomeMap() {
       yellow: 'islands#yellowIcon',
     };
 
+    // Build a lookup of markers by coords to merge with pickup points
+    const markerByCoords = new Map();
     markers.forEach(marker => {
+      const key = parseFloat(marker.lat).toFixed(6) + ',' + parseFloat(marker.lon).toFixed(6);
+      markerByCoords.set(key, marker);
+    });
+
+    // Track which markers overlap with pickup points (will be merged, not rendered separately)
+    const mergedMarkerKeys = new Set();
+
+    pickupPoints.forEach(point => {
+      if (!point.lat || !point.lon) return;
+      const key = parseFloat(point.lat).toFixed(6) + ',' + parseFloat(point.lon).toFixed(6);
+      const colocatedMarker = markerByCoords.get(key);
+      if (colocatedMarker) mergedMarkerKeys.add(key);
+
+      // Use pickup point's own photo, or fallback to co-located marker's photo
+      const photoUrl = point.photo_url || (colocatedMarker && colocatedMarker.photo_url) || null;
+      const markerInfo = colocatedMarker && colocatedMarker.info ? colocatedMarker.info : null;
+
+      const bodyParts = [];
+      if (photoUrl) {
+        bodyParts.push('<img src="' + photoUrl + '" alt="' + point.name + '" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;margin-bottom:8px;" />');
+      }
+      if (point.address) bodyParts.push('<p style="margin:0 0 6px;color:#666;font-size:12px;">' + point.address + '</p>');
+      if (point.description) bodyParts.push('<p style="margin:0 0 6px;color:#333;">' + point.description + '</p>');
+      if (point.working_hours) bodyParts.push('<p style="margin:0;color:#555;font-size:12px;">' + point.working_hours + '</p>');
+      if (markerInfo) bodyParts.push('<p style="margin:6px 0 0;font-size:13px;color:#555;">' + markerInfo + '</p>');
+      bodyParts.push('<p style="margin:6px 0 0;color:#2a7d2e;font-weight:600;font-size:13px;">Пункт выдачи</p>');
+
+      const placemark = new window.ymaps.Placemark(
+        [parseFloat(point.lat), parseFloat(point.lon)],
+        {
+          balloonContentHeader: '<strong>' + point.name + '</strong>',
+          balloonContentBody: '<div style="padding:8px;font-family:Arial;font-size:14px;max-width:260px;">' + bodyParts.join('') + '</div>',
+          hintContent: point.name,
+        },
+        {
+          preset: 'islands#greenIcon',
+          balloonPanelMaxMapArea: 0,
+        }
+      );
+
+      mapRef.current.geoObjects.add(placemark);
+    });
+
+    // Render markers that DON'T overlap with pickup points
+    markers.forEach(marker => {
+      const key = parseFloat(marker.lat).toFixed(6) + ',' + parseFloat(marker.lon).toFixed(6);
+      if (mergedMarkerKeys.has(key)) return;
+
       const photoHtml = marker.photo_url
         ? '<img src="' + marker.photo_url + '" alt="' + marker.title + '" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;margin-bottom:8px;" />'
         : '';
@@ -118,34 +168,6 @@ export default function HomeMap() {
       mapRef.current.geoObjects.add(placemark);
     });
 
-    pickupPoints.forEach(point => {
-      if (!point.lat || !point.lon) return;
-
-      const bodyParts = [];
-      if (point.photo_url) {
-        bodyParts.push('<img src="' + point.photo_url + '" alt="' + point.name + '" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;margin-bottom:8px;" />');
-      }
-      if (point.address) bodyParts.push('<p style="margin:0 0 6px;color:#666;font-size:12px;">' + point.address + '</p>');
-      if (point.description) bodyParts.push('<p style="margin:0 0 6px;color:#333;">' + point.description + '</p>');
-      if (point.working_hours) bodyParts.push('<p style="margin:0;color:#555;font-size:12px;">' + point.working_hours + '</p>');
-      bodyParts.push('<p style="margin:6px 0 0;color:#2a7d2e;font-weight:600;font-size:13px;">Пункт выдачи</p>');
-
-      const placemark = new window.ymaps.Placemark(
-        [parseFloat(point.lat), parseFloat(point.lon)],
-        {
-          balloonContentHeader: '<strong>' + point.name + '</strong>',
-          balloonContentBody: '<div style="padding:8px;font-family:Arial;font-size:14px;max-width:260px;">' + bodyParts.join('') + '</div>',
-          hintContent: point.name,
-        },
-        {
-          preset: 'islands#greenIcon',
-          balloonPanelMaxMapArea: 0,
-        }
-      );
-
-      mapRef.current.geoObjects.add(placemark);
-    });
-
     const totalObjects = markers.length + pickupPoints.filter(p => p.lat && p.lon).length;
     if (totalObjects > 0) {
       mapRef.current.setBounds(mapRef.current.geoObjects.getBounds(), {
@@ -155,7 +177,14 @@ export default function HomeMap() {
     }
   };
 
-  const redCount = markers.filter(m => m.icon_color === 'red' || !m.icon_color).length;
+  // Count standalone markers (not merged with pickup points)
+  const pickupCoords = new Set(
+    pickupPoints.filter(p => p.lat && p.lon).map(p => parseFloat(p.lat).toFixed(6) + ',' + parseFloat(p.lon).toFixed(6))
+  );
+  const redCount = markers.filter(m => {
+    const key = parseFloat(m.lat).toFixed(6) + ',' + parseFloat(m.lon).toFixed(6);
+    return !pickupCoords.has(key) && (m.icon_color === 'red' || !m.icon_color);
+  }).length;
   const greenCount = pickupPoints.filter(p => p.lat && p.lon).length;
 
   return (
