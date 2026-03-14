@@ -8,7 +8,6 @@ export default function HomeMap() {
   const [coffeeComment, setCoffeeComment] = useState('');
   const [ymapsReady, setYmapsReady] = useState(false);
 
-  // Загружаем метки, пункты выдачи и настройку комментария
   useEffect(() => {
     fetch('/api/markers')
       .then(res => res.json())
@@ -26,7 +25,6 @@ export default function HomeMap() {
       .catch(() => {});
   }, []);
 
-  // Загружаем Yandex Maps API
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
@@ -53,7 +51,6 @@ export default function HomeMap() {
     };
   }, []);
 
-  // Инициализируем карту когда всё готово
   useEffect(() => {
     if (!ymapsReady || !mapContainerRef.current) return;
     
@@ -91,27 +88,25 @@ export default function HomeMap() {
       yellow: 'islands#yellowIcon',
     };
 
-    // Красные/другие метки (кофейни и т.д.)
     markers.forEach(marker => {
       const photoHtml = marker.photo_url
-        ? `<img src="${marker.photo_url}" alt="${marker.title}" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;margin-bottom:8px;" />`
+        ? '<img src="' + marker.photo_url + '" alt="' + marker.title + '" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;margin-bottom:8px;" />'
         : '';
       const infoHtml = marker.info
-        ? `<p style="margin:6px 0 0;font-size:13px;color:#555;">☕ ${marker.info}</p>`
+        ? '<p style="margin:6px 0 0;font-size:13px;color:#555;">' + marker.info + '</p>'
         : '';
+
+      const bodyParts = [];
+      if (photoHtml) bodyParts.push(photoHtml);
+      if (marker.description) bodyParts.push('<p style="margin:0 0 8px;color:#333;">' + marker.description + '</p>');
+      if (marker.address) bodyParts.push('<p style="margin:0 0 4px;color:#666;font-size:12px;">' + marker.address + '</p>');
+      if (infoHtml) bodyParts.push(infoHtml);
 
       const placemark = new window.ymaps.Placemark(
         [parseFloat(marker.lat), parseFloat(marker.lon)],
         {
-          balloonContentHeader: `<strong>${marker.title}</strong>`,
-          balloonContentBody: `
-            <div style="padding:8px;font-family:Arial;font-size:14px;max-width:260px;">
-              ${photoHtml}
-              ${marker.description ? `<p style="margin:0 0 8px;color:#333;">${marker.description}</p>` : ''}
-              ${marker.address ? `<p style="margin:0 0 4px;color:#666;font-size:12px;">\ud83d\udccd ${marker.address}</p>` : ''}
-              ${infoHtml}
-            </div>
-          `,
+          balloonContentHeader: '<strong>' + marker.title + '</strong>',
+          balloonContentBody: '<div style="padding:8px;font-family:Arial;font-size:14px;max-width:260px;">' + bodyParts.join('') + '</div>',
           hintContent: marker.title,
         },
         {
@@ -123,22 +118,23 @@ export default function HomeMap() {
       mapRef.current.geoObjects.add(placemark);
     });
 
-    // Зелёные метки — пункты выдачи
     pickupPoints.forEach(point => {
       if (!point.lat || !point.lon) return;
+
+      const bodyParts = [];
+      if (point.photo_url) {
+        bodyParts.push('<img src="' + point.photo_url + '" alt="' + point.name + '" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;margin-bottom:8px;" />');
+      }
+      if (point.address) bodyParts.push('<p style="margin:0 0 6px;color:#666;font-size:12px;">' + point.address + '</p>');
+      if (point.description) bodyParts.push('<p style="margin:0 0 6px;color:#333;">' + point.description + '</p>');
+      if (point.working_hours) bodyParts.push('<p style="margin:0;color:#555;font-size:12px;">' + point.working_hours + '</p>');
+      bodyParts.push('<p style="margin:6px 0 0;color:#2a7d2e;font-weight:600;font-size:13px;">Пункт выдачи</p>');
 
       const placemark = new window.ymaps.Placemark(
         [parseFloat(point.lat), parseFloat(point.lon)],
         {
-          balloonContentHeader: `<strong>\ud83d\udce6 ${point.name}</strong>`,
-          balloonContentBody: `
-            <div style="padding:8px;font-family:Arial;font-size:14px;max-width:260px;">
-              ${point.address ? `<p style="margin:0 0 6px;color:#666;font-size:12px;">\ud83d\udccd ${point.address}</p>` : ''}
-              ${point.description ? `<p style="margin:0 0 6px;color:#333;">${point.description}</p>` : ''}
-              ${point.working_hours ? `<p style="margin:0;color:#555;font-size:12px;">\ud83d\udd52 ${point.working_hours}</p>` : ''}
-              <p style="margin:6px 0 0;color:#2a7d2e;font-weight:600;font-size:13px;">\u2705 \u041f\u0443\u043d\u043a\u0442 \u0432\u044b\u0434\u0430\u0447\u0438</p>
-            </div>
-          `,
+          balloonContentHeader: '<strong>' + point.name + '</strong>',
+          balloonContentBody: '<div style="padding:8px;font-family:Arial;font-size:14px;max-width:260px;">' + bodyParts.join('') + '</div>',
           hintContent: point.name,
         },
         {
@@ -150,7 +146,6 @@ export default function HomeMap() {
       mapRef.current.geoObjects.add(placemark);
     });
 
-    // Центрируем карту
     const totalObjects = markers.length + pickupPoints.filter(p => p.lat && p.lon).length;
     if (totalObjects > 0) {
       mapRef.current.setBounds(mapRef.current.geoObjects.getBounds(), {
@@ -166,8 +161,8 @@ export default function HomeMap() {
   return (
     <section className="home-map-section" id="dvs">
       <div className="container">
-        <h2 className="section-title">\ud83d\uddfa\ufe0f \u041a\u0430\u0440\u0442\u0430 \u043f\u0440\u043e\u0434\u0430\u0436</h2>
-        <p className="section-subtitle">\u041d\u0430\u0448\u0438 \u0442\u043e\u0447\u043a\u0438 \u0438 \u043c\u0435\u0441\u0442\u0430 \u0434\u043e\u0441\u0442\u0430\u0432\u043a\u0438</p>
+        <h2 className="section-title">Карта продаж</h2>
+        <p className="section-subtitle">Наши точки и места доставки</p>
         
         <div 
           ref={mapContainerRef} 
@@ -181,19 +176,18 @@ export default function HomeMap() {
           }}
         />
 
-        {/* Счётчики под картой */}
         <div className="map-stats">
           <div className="map-stats__item map-stats__item--green">
             <span className="map-stats__dot map-stats__dot--green"></span>
             <div>
-              <span className="map-stats__label">\u041f\u0443\u043d\u043a\u0442\u044b \u0432\u044b\u0434\u0430\u0447\u0438</span>
+              <span className="map-stats__label">Пункты выдачи</span>
               <span className="map-stats__count">{greenCount}</span>
             </div>
           </div>
           <div className="map-stats__item map-stats__item--red">
             <span className="map-stats__dot map-stats__dot--red"></span>
             <div>
-              <span className="map-stats__label">\u041a\u043e\u0444\u0435\u0439\u043d\u0438</span>
+              <span className="map-stats__label">Кофейни</span>
               <span className="map-stats__count">{redCount}</span>
               {coffeeComment && (
                 <span className="map-stats__comment">{coffeeComment}</span>
@@ -208,21 +202,18 @@ export default function HomeMap() {
           padding: 80px 0;
           background: linear-gradient(180deg, #fff 0%, #f6f1e9 100%);
         }
-
         .home-map-section .section-title {
           font-size: 40px;
           text-align: center;
           margin-bottom: 10px;
           color: #2b2620;
         }
-
         .home-map-section .section-subtitle {
           text-align: center;
           color: #8a7b6a;
           font-size: 16px;
           margin-bottom: 40px;
         }
-
         .map-stats {
           display: flex;
           justify-content: center;
@@ -230,7 +221,6 @@ export default function HomeMap() {
           margin-top: 24px;
           flex-wrap: wrap;
         }
-
         .map-stats__item {
           display: flex;
           align-items: flex-start;
@@ -241,7 +231,6 @@ export default function HomeMap() {
           box-shadow: 0 2px 12px rgba(0,0,0,0.06);
           min-width: 180px;
         }
-
         .map-stats__dot {
           width: 14px;
           height: 14px;
@@ -251,25 +240,21 @@ export default function HomeMap() {
         }
         .map-stats__dot--green { background: #34a853; }
         .map-stats__dot--red { background: #e31937; }
-
         .map-stats__item > div {
           display: flex;
           flex-direction: column;
         }
-
         .map-stats__label {
           font-size: 14px;
           color: #666;
           font-weight: 500;
         }
-
         .map-stats__count {
           font-size: 26px;
           font-weight: 800;
           color: #1a1a2e;
           line-height: 1.2;
         }
-
         .map-stats__comment {
           font-size: 13px;
           color: #888;

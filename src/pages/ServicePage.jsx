@@ -61,14 +61,8 @@ export default function ServicePage() {
                 <img src={mainImage} alt={service.name} />
               </div>
             ) : (
-              <div className="service-page__image-placeholder">
-                <svg viewBox="0 0 200 200" width="120" height="120" xmlns="http://www.w3.org/2000/svg">
-                  <circle cx="100" cy="100" r="90" fill="#e8f5e9" stroke="#4caf50" strokeWidth="3"/>
-                  <path d="M70 60h60c5 0 9 4 9 9v10l15 12v46l-15 12v10c0 5-4 9-9 9H70c-5 0-9-4-9-9V69c0-5 4-9 9-9z" fill="#4caf50" opacity="0.85"/>
-                  <rect x="80" y="80" width="40" height="50" rx="5" fill="#fff" opacity="0.9"/>
-                  <circle cx="100" cy="100" r="12" fill="#4caf50"/>
-                  <circle cx="100" cy="100" r="5" fill="#fff"/>
-                </svg>
+              <div className="service-page__image-wrapper">
+                <img src="/main_photos/photomain.jpg" alt={service.name} />
               </div>
             )}
           </div>

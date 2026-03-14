@@ -47,15 +47,9 @@ export default function Admin() {
     description: '',
     working_hours: '',
     store_id: '',
-    is_active: true
-  })
-
-  // Состояние для управления пользователями
-  const [users, setUsers] = useState([])
-  const [usersLoading, setUsersLoading] = useState(false)
-  const [showUsersSection, setShowUsersSection] = useState(false)
-
-  // Состояние для комментария кофеен
+  is_active: true,
+  photo_url: ''
+})
   const [coffeeComment, setCoffeeComment] = useState('')
   const [coffeeCommentSaving, setCoffeeCommentSaving] = useState(false)
 
@@ -451,7 +445,8 @@ export default function Admin() {
       description: '',
       working_hours: '',
       store_id: '',
-      is_active: true
+      is_active: true,
+      photo_url: ''
     })
     setPickupAddressInput('')
     setEditingPickup(null)
@@ -495,7 +490,8 @@ export default function Admin() {
       description: point.description || '',
       working_hours: point.working_hours || '',
       store_id: point.store_id || '',
-      is_active: point.is_active
+      is_active: point.is_active,
+      photo_url: point.photo_url || ''
     })
     setPickupAddressInput(point.address || '')
     setEditingPickup(point)
@@ -636,12 +632,30 @@ export default function Admin() {
                 </div>
 
                 <div className="form-group">
-                  <label>URL фотографии</label>
+                  <label>Фотография</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      const fd = new FormData()
+                      fd.append('photo', file)
+                      try {
+                        const r = await fetch('/api/upload', { method: 'POST', body: fd })
+                        if (r.ok) {
+                          const data = await r.json()
+                          setMarkerForm({...markerForm, photo_url: data.url})
+                        }
+                      } catch (err) { console.error('Ошибка загрузки:', err) }
+                    }}
+                    style={{ marginBottom: '8px' }}
+                  />
                   <input
                     type="text"
                     value={markerForm.photo_url}
                     onChange={(e) => setMarkerForm({...markerForm, photo_url: e.target.value})}
-                    placeholder="https://example.com/photo.jpg"
+                    placeholder="или введите URL вручную"
                   />
                   {markerForm.photo_url && (
                     <img src={markerForm.photo_url} alt="Превью" style={{maxWidth:'200px',maxHeight:'120px',marginTop:'8px',borderRadius:'8px',objectFit:'cover'}} />
@@ -859,6 +873,37 @@ export default function Admin() {
                 <p className="form-hint" style={{ fontSize: '12px', color: '#8a7b6a', marginTop: '4px' }}>
                   Привяжите пункт выдачи к складу, чтобы отображались остатки товаров
                 </p>
+              </div>
+
+              <div className="form-group">
+                <label>Фотография</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    const fd = new FormData()
+                    fd.append('photo', file)
+                    try {
+                      const r = await fetch('/api/upload', { method: 'POST', body: fd })
+                      if (r.ok) {
+                        const data = await r.json()
+                        setPickupForm({...pickupForm, photo_url: data.url})
+                      }
+                    } catch (err) { console.error('Ошибка загрузки:', err) }
+                  }}
+                  style={{ marginBottom: '8px' }}
+                />
+                <input
+                  type="text"
+                  value={pickupForm.photo_url}
+                  onChange={(e) => setPickupForm({...pickupForm, photo_url: e.target.value})}
+                  placeholder="или введите URL вручную"
+                />
+                {pickupForm.photo_url && (
+                  <img src={pickupForm.photo_url} alt="Превью" style={{maxWidth:'200px',maxHeight:'120px',marginTop:'8px',borderRadius:'8px',objectFit:'cover'}} />
+                )}
               </div>
 
               <div className="form-group">

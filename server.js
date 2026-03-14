@@ -4,6 +4,10 @@ import dotenv from 'dotenv';
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 import { 
   initDatabase, 
   upsertUser, 
@@ -45,8 +49,44 @@ const JWT_SECRET = process.env.JWT_SECRET || 'shahcoffee-secret-key-2026';
 // Инициализация БД при старте
 initDatabase().catch(console.error);
 
+// === FILE UPLOAD SETUP ===
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const UPLOADS_DIR = path.join(__dirname, 'dist', 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, UPLOADS_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.jpg';
+    const safeName = Date.now() + '-' + Math.round(Math.random() * 1e6) + ext;
+    cb(null, safeName);
+  }
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Только изображения'));
+  }
+});
+
+// Статика для загруженных файлов
+app.use('/uploads', express.static(UPLOADS_DIR));
+
 app.get('/health', (req, res) => {
   res.json({ ok: true });
+});
+
+// === FILE UPLOAD ENDPOINT ===
+app.post('/api/upload', upload.single('photo'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
+  const url = '/uploads/' + req.file.filename;
+  console.log('📷 Загружено фото:', url);
+  res.json({ url });
 });
 
 
@@ -1669,7 +1709,7 @@ app.get('/api/admin/pickup-points', requireAdmin, async (req, res) => {
 
 app.post('/api/admin/pickup-points', requireAdmin, async (req, res) => {
   try {
-    const { name, address, lat, lon, description, working_hours, store_id, is_active } = req.body;
+    const { name, address, lat, lon, description, working_hours, store_id, is_active, photo_url } = req.body;
     if (!name || lat == null || lon == null) {
       return res.status(400).json({ error: 'Name, lat and lon are required' });
     }
@@ -1682,6 +1722,7 @@ app.post('/api/admin/pickup-points', requireAdmin, async (req, res) => {
       working_hours: working_hours || null,
       store_id: store_id || null,
       is_active: is_active !== false,
+      photo_url: photo_url || null,
     });
     console.log('✓ Пункт выдачи создан:', name);
     res.json(point);
@@ -1693,7 +1734,7 @@ app.post('/api/admin/pickup-points', requireAdmin, async (req, res) => {
 
 app.put('/api/admin/pickup-points/:id', requireAdmin, async (req, res) => {
   try {
-    const { name, address, lat, lon, description, working_hours, store_id, is_active } = req.body;
+    const { name, address, lat, lon, description, working_hours, store_id, is_active, photo_url } = req.body;
     const point = await updatePickupPoint(req.params.id, {
       name,
       address: address ?? '',
@@ -1703,6 +1744,7 @@ app.put('/api/admin/pickup-points/:id', requireAdmin, async (req, res) => {
       working_hours: working_hours ?? null,
       store_id: store_id ?? null,
       is_active: is_active !== false,
+      photo_url: photo_url ?? null,
     });
     console.log('✓ Пункт выдачи обновлён:', name);
     res.json(point);

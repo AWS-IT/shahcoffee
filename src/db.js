@@ -144,7 +144,11 @@ export async function initDatabase() {
       await connection.query(`ALTER TABLE map_markers ADD COLUMN info TEXT DEFAULT NULL`);
       console.log('✓ Добавлена колонка info в map_markers');
     } catch (e) {}
-
+    // Миграция: добавляем photo_url в pickup_points
+    try {
+      await connection.query(`ALTER TABLE pickup_points ADD COLUMN photo_url TEXT DEFAULT NULL`);
+      console.log('\u2713 Добавлена колонка photo_url в pickup_points');
+    } catch (e) {}
     // Авто-сидирование: добавляем пункты выдачи по умолчанию если таблица пуста
     const [existingPoints] = await connection.query('SELECT COUNT(*) as cnt FROM pickup_points');
     if (existingPoints[0].cnt === 0) {
@@ -598,7 +602,7 @@ export async function deleteMapMarker(id) {
 // Получить активные пункты выдачи (для чекаута и публичного API)
 export async function getPickupPoints() {
   const [rows] = await pool.query(
-    'SELECT id, name, address, lat, lon, description, working_hours, store_id, is_active FROM pickup_points WHERE is_active = TRUE ORDER BY name'
+    'SELECT id, name, address, lat, lon, description, working_hours, store_id, photo_url, is_active FROM pickup_points WHERE is_active = TRUE ORDER BY name'
   );
   return rows.map((row) => ({
     id: row.id,
@@ -609,6 +613,7 @@ export async function getPickupPoints() {
     description: row.description,
     working_hours: row.working_hours,
     store_id: row.store_id || null,
+    photo_url: row.photo_url || null,
     is_active: Boolean(row.is_active),
   }));
 }
@@ -635,21 +640,21 @@ export async function getAllPickupPoints() {
 
 // Создать пункт выдачи
 export async function createPickupPoint(pickup) {
-  const { name, address, lat, lon, description, working_hours, store_id, is_active } = pickup;
+  const { name, address, lat, lon, description, working_hours, store_id, is_active, photo_url } = pickup;
   const [result] = await pool.query(
-    `INSERT INTO pickup_points (name, address, lat, lon, description, working_hours, store_id, is_active)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [name, address || '', lat, lon, description || null, working_hours || null, store_id || null, is_active !== false]
+    `INSERT INTO pickup_points (name, address, lat, lon, description, working_hours, store_id, is_active, photo_url)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [name, address || '', lat, lon, description || null, working_hours || null, store_id || null, is_active !== false, photo_url || null]
   );
   return { id: result.insertId, ...pickup };
 }
 
 // Обновить пункт выдачи
 export async function updatePickupPoint(id, pickup) {
-  const { name, address, lat, lon, description, working_hours, store_id, is_active } = pickup;
+  const { name, address, lat, lon, description, working_hours, store_id, is_active, photo_url } = pickup;
   await pool.query(
-    `UPDATE pickup_points SET name = ?, address = ?, lat = ?, lon = ?, description = ?, working_hours = ?, store_id = ?, is_active = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-    [name, address, lat, lon, description || null, working_hours || null, store_id || null, is_active !== false, id]
+    `UPDATE pickup_points SET name = ?, address = ?, lat = ?, lon = ?, description = ?, working_hours = ?, store_id = ?, is_active = ?, photo_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [name, address, lat, lon, description || null, working_hours || null, store_id || null, is_active !== false, photo_url || null, id]
   );
   return { id, ...pickup };
 }
