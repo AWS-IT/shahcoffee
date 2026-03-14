@@ -596,7 +596,7 @@ export async function getPickupPoints() {
 
 export async function getAllPickupPoints() {
   const [rows] = await pool.query(
-    'SELECT id, name, address, lat, lon, description, working_hours, store_id, is_active, created_at, updated_at FROM pickup_points ORDER BY name'
+    'SELECT id, name, address, lat, lon, description, working_hours, store_id, photo_url, is_active, created_at, updated_at FROM pickup_points ORDER BY name'
   );
   return rows.map((row) => ({
     id: row.id,
@@ -607,6 +607,7 @@ export async function getAllPickupPoints() {
     description: row.description,
     working_hours: row.working_hours,
     store_id: row.store_id || null,
+    photo_url: row.photo_url || null,
     is_active: Boolean(row.is_active),
     created_at: row.created_at,
     updated_at: row.updated_at,

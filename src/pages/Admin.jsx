@@ -59,6 +59,11 @@ export default function Admin() {
   const [servicesLoading, setServicesLoading] = useState(false)
   const [serviceSaving, setServiceSaving] = useState(false)
 
+  // Состояние для пользователей
+  const [users, setUsers] = useState([])
+  const [usersLoading, setUsersLoading] = useState(false)
+  const [showUsersSection, setShowUsersSection] = useState(false)
+
   // Проверка доступа при загрузке
   useEffect(() => {
     const verifyAccess = async () => {
