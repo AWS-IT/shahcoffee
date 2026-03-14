@@ -217,19 +217,20 @@ export default function HomeMap() {
         .map-stats {
           display: flex;
           justify-content: center;
-          gap: 32px;
+          gap: 16px;
           margin-top: 24px;
-          flex-wrap: wrap;
         }
         .map-stats__item {
           display: flex;
           align-items: flex-start;
-          gap: 12px;
+          gap: 10px;
           background: #fff;
           border-radius: 14px;
-          padding: 16px 24px;
+          padding: 14px 18px;
           box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-          min-width: 180px;
+          flex: 1;
+          max-width: 220px;
+          min-width: 0;
         }
         .map-stats__dot {
           width: 14px;
