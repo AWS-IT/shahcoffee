@@ -110,7 +110,7 @@ export default function HomeMap() {
 
       const bodyParts = [];
       if (photoUrl) {
-        bodyParts.push('<img src="' + photoUrl + '" alt="' + point.name + '" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;margin-bottom:8px;" />');
+        bodyParts.push('<img src="' + photoUrl + '" alt="' + point.name + '" style="width:100%;border-radius:8px;margin-bottom:8px;" />');
       }
       if (point.address) bodyParts.push('<p style="margin:0 0 6px;color:#666;font-size:12px;">' + point.address + '</p>');
       if (point.description) bodyParts.push('<p style="margin:0 0 6px;color:#333;">' + point.description + '</p>');
@@ -140,7 +140,7 @@ export default function HomeMap() {
       if (mergedMarkerKeys.has(key)) return;
 
       const photoHtml = marker.photo_url
-        ? '<img src="' + marker.photo_url + '" alt="' + marker.title + '" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;margin-bottom:8px;" />'
+        ? '<img src="' + marker.photo_url + '" alt="' + marker.title + '" style="width:100%;border-radius:8px;margin-bottom:8px;" />'
         : '';
       const infoHtml = marker.info
         ? '<p style="margin:6px 0 0;font-size:13px;color:#555;">' + marker.info + '</p>'
