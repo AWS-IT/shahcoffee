@@ -1,41 +1,31 @@
 #!/bin/bash
 
-# Deploy скрипт для shahcoffee проекта
-
 set -e
 
+APP_DIR=/var/www/shahcoffee
+cd "$APP_DIR"
+
 echo "=== Deploy shahcoffee ==="
-
-# 1. Обновляем код из репозитория
 echo "1. Обновляем код..."
-cd /var/www/shahcoffee
-git pull origin main
+git pull --ff-only origin main
 
-# 2. Устанавливаем зависимости
 echo "2. Устанавливаем зависимости..."
-npm ci --omit=dev
+npm ci
 
-# 3. Собираем React проект
 echo "3. Собираем проект..."
 npm run build
 
-# 4. Перезапускаем Node.js сервер (используем PM2 или systemctl)
-echo "4. Перезапускаем сервер..."
+echo "4. Удаляем dev-зависимости..."
+npm prune --omit=dev
 
-# Вариант 1: Если используется PM2
-if command -v pm2 &> /dev/null; then
-    pm2 restart shahcoffee
-    echo "✓ PM2 restarted"
+echo "5. Перезапускаем backend..."
+if command -v pm2 >/dev/null 2>&1; then
+  pm2 restart shahcoffee
+  pm2 save
 fi
 
-# Вариант 2: Если используется systemctl
-# sudo systemctl restart shahcoffee
+echo "6. Проверяем и перезагружаем nginx..."
+nginx -t
+systemctl reload nginx
 
-# 5. Проверяем nginx конфиг и перезагружаем
-echo "5. Проверяем и перезагружаем nginx..."
-sudo nginx -t
-sudo systemctl reload nginx
-
-echo "✓ Deploy успешно завершен!"
-echo "Frontend: /var/www/shahcoffee/dist"
-echo "Backend: localhost:3001"
+echo "Deploy завершен"
