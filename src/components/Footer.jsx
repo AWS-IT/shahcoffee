@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 function Footer() {
   const currentYear = new Date().getFullYear();
@@ -86,6 +87,9 @@ function Footer() {
            <p className="footer__copyright">
               © {currentYear} Все права защищены
             </p>
+            <Link to="/privacy-policy" className="footer__nav-link" style={{ color: '#9c9c9c', textDecoration: 'underline' }}>
+              Политика конфиденциальности
+            </Link>
         </div>
       </div>
     </footer>

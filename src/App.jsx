@@ -17,6 +17,8 @@ import LoginPage from './pages/LoginPage.jsx'
 import Admin from './pages/Admin.jsx'
 import ServicePage from './pages/ServicePage.jsx'
 import ServiceCheckoutPage from './pages/ServiceCheckoutPage.jsx'
+import CookieConsent from './components/CookieConsent';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 
 function AppContent() {
   const location = useLocation()
@@ -68,8 +70,11 @@ function AppContent() {
           <Route path="/service/:id" element={<ServicePage />} />
           <Route path="/service-checkout/:id" element={<ServiceCheckoutPage />} />
           <Route path="*" element={<h1 style={{padding: '100px', textAlign: 'center'}}>404 — Страница не найдена</h1>} />
+
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         </Routes>
       </main>
+      <CookieConsent />
       <Footer />
     </div>
   )
