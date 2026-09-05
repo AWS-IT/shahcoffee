@@ -4,9 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
 import AddressSuggest from '../components/AddressSuggest.jsx'
-
-// Ключ терминала T-Bank
-const TBANK_TERMINAL_KEY = '1769767428904';
+import { TBANK_TERMINAL_KEY, probeTbankWidgetAvailable } from '../utils/tbankWidget.js'
 
 export default function CartPage() {
   const { cart, updateQuantity, removeFromCart, clearCart, totalPrice } = useCart()
@@ -14,7 +12,6 @@ export default function CartPage() {
   const navigate = useNavigate()
   const [showCheckout, setShowCheckout] = useState(false)
   const [showPaymentButtons, setShowPaymentButtons] = useState(false)
-  const [showOtherMethods, setShowOtherMethods] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -28,104 +25,131 @@ export default function CartPage() {
   const [pickupPoints, setPickupPoints] = useState([])
   const [stockByStore, setStockByStore] = useState({})
   const [stockLoaded, setStockLoaded] = useState(false)
+  // null = ещё проверяем серт Минцифры; true = виджет; false = редирект-кнопка
+  const [widgetOk, setWidgetOk] = useState(null)
+  const [widgetMountTick, setWidgetMountTick] = useState(0)
   const paymentContainerRef = useRef(null)
   const integrationLoadedRef = useRef(false)
+  const orderDataRef = useRef(null)
+  const payInFlightRef = useRef(null)
 
-  // Загрузка и инициализация T-Bank виджета
   useEffect(() => {
-    if (!showPaymentButtons || !paymentContainerRef.current || integrationLoadedRef.current) {
+    orderDataRef.current = orderData
+  }, [orderData])
+
+  // Проверка доступа к securepay (нужен сертификат Минцифры)
+  useEffect(() => {
+    if (!showPaymentButtons) return
+    let cancelled = false
+    setWidgetOk(null)
+    integrationLoadedRef.current = false
+    probeTbankWidgetAvailable().then((ok) => {
+      if (!cancelled) setWidgetOk(ok)
+    })
+    return () => { cancelled = true }
+  }, [showPaymentButtons])
+
+  // Виджет только если серт ок
+  useEffect(() => {
+    if (!showPaymentButtons || widgetOk !== true || integrationLoadedRef.current) {
       return
     }
+    if (!paymentContainerRef.current) {
+      const id = requestAnimationFrame(() => setWidgetMountTick((t) => t + 1))
+      return () => cancelAnimationFrame(id)
+    }
 
-    // Функция получения PaymentURL должна быть определена внутри useEffect
-    // чтобы использовать актуальные данные orderData
     const loadTBankWidget = async () => {
-      // Загружаем скрипт integration.js
-      if (!window.PaymentIntegration) {
-        const script = document.createElement('script')
-        script.src = 'https://integrationjs.tbank.ru/integration.js'
-        script.async = true
-        
-        await new Promise((resolve, reject) => {
-          script.onload = resolve
-          script.onerror = reject
-          document.body.appendChild(script)
-        })
-      }
-
-      // Callback для получения PaymentURL — вызывается при нажатии на кнопку оплаты
-      const paymentStartCallback = async () => {
-        console.log('paymentStartCallback called, orderData:', orderData)
-        
-        if (!orderData) {
-          console.error('No order data available')
-          throw new Error('Данные заказа не готовы')
+      try {
+        if (!window.PaymentIntegration) {
+          const script = document.createElement('script')
+          script.src = 'https://integrationjs.tbank.ru/integration.js'
+          script.async = true
+          await new Promise((resolve, reject) => {
+            script.onload = resolve
+            script.onerror = reject
+            document.body.appendChild(script)
+          })
         }
 
-        // Используем данные из orderData, т.к. cart мог измениться
-        const response = await fetch('/api/tbank/initiate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            orderId: orderData.orderId,
-            amount: orderData.totalPrice,
-            description: `Заказ на имя ${orderData.customerData.name}`,
-            userId: user?.id || null,
-            customerData: orderData.customerData,
-            items: orderData.items,
-            coordinates: orderData.coordinates,
-            data: {
-              customerEmail: orderData.customerData.email,
-              customerPhone: orderData.customerData.phone,
-              customerName: orderData.customerData.name,
-              customerAddress: orderData.customerData.address,
+        const paymentStartCallback = async () => {
+          if (payInFlightRef.current) return payInFlightRef.current
+
+          payInFlightRef.current = (async () => {
+            const current = orderDataRef.current
+            if (!current) throw new Error('Данные заказа не готовы')
+
+            const amount = Number(current.totalPrice)
+            if (!Number.isFinite(amount) || amount <= 0) {
+              throw new Error('Некорректная сумма заказа')
             }
-          }),
-        })
 
-        if (!response.ok) {
-          throw new Error('Ошибка при инициировании платежа')
-        }
+            // Новый orderId на каждую попытку
+            const orderId = `order-${Date.now()}`
+            const next = { ...current, orderId }
+            orderDataRef.current = next
+            setOrderData(next)
+            localStorage.setItem('pendingOrder', JSON.stringify(next))
 
-        const paymentData = await response.json()
-        console.log('T-Bank payment init response:', paymentData)
+            const response = await fetch('/api/tbank/initiate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                orderId,
+                amount,
+                description: `Заказ на имя ${next.customerData.name}`,
+                userId: user?.id || null,
+                customerData: next.customerData,
+                items: next.items,
+                coordinates: next.coordinates,
+                widget: true,
+                data: {
+                  customerEmail: next.customerData.email,
+                  customerPhone: next.customerData.phone,
+                  customerName: next.customerData.name,
+                  customerAddress: next.customerData.address,
+                }
+              }),
+            })
 
-        if (!paymentData.PaymentURL) {
-          throw new Error('Не получен URL для оплаты')
-        }
+            const paymentData = await response.json().catch(() => ({}))
+            if (!response.ok) {
+              const details = paymentData?.body?.Details || paymentData?.body?.Message || paymentData?.error
+              throw new Error(details || 'Ошибка при инициировании платежа')
+            }
+            if (!paymentData.PaymentURL) throw new Error('Не получен URL для оплаты')
+            return paymentData.PaymentURL
+          })()
 
-        return paymentData.PaymentURL
-      }
-
-      // Инициализируем виджет с paymentStartCallback в конфигурации
-      const initConfig = {
-        terminalKey: TBANK_TERMINAL_KEY,
-        product: 'eacq',
-        features: {
-          payment: {
-            container: paymentContainerRef.current,
-            paymentStartCallback: paymentStartCallback,
+          try {
+            return await payInFlightRef.current
+          } finally {
+            setTimeout(() => { payInFlightRef.current = null }, 1500)
           }
         }
-      }
 
-      try {
-        const integration = await window.PaymentIntegration.init(initConfig)
-        console.log('T-Bank integration initialized with payment buttons')
-        
+        await window.PaymentIntegration.init({
+          terminalKey: TBANK_TERMINAL_KEY,
+          product: 'eacq',
+          features: {
+            payment: {
+              container: paymentContainerRef.current,
+              paymentStartCallback,
+            }
+          }
+        })
         integrationLoadedRef.current = true
         setLoading(false)
-        
-        console.log('T-Bank payment buttons ready')
       } catch (err) {
         console.error('T-Bank widget init error:', err)
-        setError('Ошибка загрузки платёжных кнопок: ' + err.message)
+        // Виджет не поднялся — откатываемся на кнопку-редирект
+        setWidgetOk(false)
         setLoading(false)
       }
     }
 
     loadTBankWidget()
-  }, [showPaymentButtons, orderData, totalPrice, formData, clearCart, navigate])
+  }, [showPaymentButtons, widgetOk, widgetMountTick, user])
 
   // Загрузка пунктов выдачи и остатков при открытии формы оформления заказа
   useEffect(() => {
@@ -282,10 +306,7 @@ export default function CartPage() {
       
       localStorage.setItem('pendingOrder', JSON.stringify(orderInfo))
       setOrderData(orderInfo)
-      
-      // Показываем кнопки оплаты
       setShowPaymentButtons(true)
-      integrationLoadedRef.current = false
       setLoading(false)
       
     } catch (err) {
@@ -295,46 +316,58 @@ export default function CartPage() {
     }
   }
 
-  // Альтернативная оплата — редирект на стандартную форму T-Bank
-  const handleFallbackPayment = async () => {
+  // Редирект на платёжную страницу T-Bank (pay.tbank.ru — обычный LE-сертификат,
+  // в отличие от виджета на securepay.tinkoff.ru с корнем Минцифры)
+  const handlePayment = async () => {
     if (!orderData) return
-    
+
+    const amount = Number(orderData.totalPrice)
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setError('Некорректная сумма заказа')
+      return
+    }
+
     setLoading(true)
     setError(null)
-    
+
+    // Новый orderId на каждую попытку — T-Bank отклоняет повтор с тем же OrderId
+    const orderId = `order-${Date.now()}`
+    const nextOrder = { ...orderData, orderId }
+    setOrderData(nextOrder)
+    localStorage.setItem('pendingOrder', JSON.stringify(nextOrder))
+
     try {
-      // Используем данные из orderData
       const response = await fetch('/api/tbank/initiate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          orderId: orderData.orderId,
-          amount: orderData.totalPrice,
-          description: `Заказ на имя ${orderData.customerData.name}`,
+          orderId,
+          amount,
+          description: `Заказ на имя ${nextOrder.customerData.name}`,
           userId: user?.id || null,
-          customerData: orderData.customerData,
-          items: orderData.items,
-          coordinates: orderData.coordinates,
+          customerData: nextOrder.customerData,
+          items: nextOrder.items,
+          coordinates: nextOrder.coordinates,
           data: {
-            customerEmail: orderData.customerData.email,
-            customerPhone: orderData.customerData.phone,
-            customerName: orderData.customerData.name,
-            customerAddress: orderData.customerData.address,
+            customerEmail: nextOrder.customerData.email,
+            customerPhone: nextOrder.customerData.phone,
+            customerName: nextOrder.customerData.name,
+            customerAddress: nextOrder.customerData.address,
           }
         }),
       })
 
+      const paymentData = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error('Ошибка при инициировании платежа')
+        const details = paymentData?.body?.Details || paymentData?.body?.Message || paymentData?.error
+        throw new Error(details || 'Ошибка при инициировании платежа')
       }
 
-      const paymentData = await response.json()
-      
-      if (paymentData.PaymentURL) {
-        window.location.href = paymentData.PaymentURL
-      } else {
+      if (!paymentData.PaymentURL) {
         throw new Error('Не получен URL для оплаты')
       }
+
+      window.location.href = paymentData.PaymentURL
     } catch (err) {
       console.error('Ошибка оплаты:', err)
       setError(err.message)
@@ -469,71 +502,62 @@ export default function CartPage() {
                     </div>
                   )}
 
-                  {loading && (
+                  {widgetOk === null && (
                     <div className="loading-spinner">
-                      <p>Загрузка способов оплаты...</p>
+                      <p>Подбираем способ оплаты…</p>
                     </div>
                   )}
 
-                  {/* Основной блок — СБП (приоритетный способ) */}
-                  <div className="sbp-primary-block">
-                    <div className="sbp-badge">Быстро и без комиссии</div>
-                    <div className="sbp-icon-row">
-                      <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <rect width="40" height="40" rx="10" fill="#fff"/>
-                        <path d="M20 6L12 10.5V19.5L20 24L28 19.5V10.5L20 6Z" fill="#5B2D8E"/>
-                        <path d="M20 24L12 19.5V28.5L20 33L28 28.5V19.5L20 24Z" fill="#F26F23"/>
-                        <path d="M12 10.5L20 15L28 10.5" stroke="#1FA8F1" strokeWidth="1.5"/>
-                        <path d="M20 15V24" stroke="#35B44F" strokeWidth="1.5"/>
-                      </svg>
-                      <span className="sbp-title">Оплата через СБП</span>
-                    </div>
-                    <p className="sbp-description">
-                      Моментальная оплата через Систему быстрых платежей — прямо из приложения вашего банка
-                    </p>
-
-                    {/* Контейнер для кнопок T-Bank (СБП, T-Pay) */}
-                    <div 
-                      ref={paymentContainerRef} 
-                      id="tbank-payment-container"
-                      className="tbank-payment-buttons"
-                      style={{ minHeight: '60px' }}
-                    />
-                  </div>
-
-                  {/* Другие способы оплаты — скрыты за кнопкой */}
-                  <div className="other-methods-section">
-                    <button
-                      type="button"
-                      className="other-methods-toggle"
-                      onClick={() => setShowOtherMethods(!showOtherMethods)}
-                    >
-                      {showOtherMethods ? '▲ Скрыть другие способы' : '▼ Другие способы оплаты'}
-                    </button>
-
-                    {showOtherMethods && (
-                      <div className="other-methods-content">
+                  {widgetOk === true && (
+                    <div className="sbp-primary-block">
+                      <div className="sbp-badge">Быстро и без комиссии</div>
+                      <div className="sbp-icon-row">
+                        <span className="sbp-title">Оплата через СБП / T-Pay</span>
+                      </div>
+                      <div
+                        ref={paymentContainerRef}
+                        id="tbank-payment-container"
+                        className="tbank-payment-buttons"
+                        style={{ minHeight: '60px' }}
+                      />
+                      <p className="payment-hint" style={{ marginTop: 12 }}>
+                        или{' '}
                         <button
                           type="button"
-                          onClick={handleFallbackPayment}
+                          onClick={handlePayment}
                           disabled={loading}
-                          className="btn-secondary btn-lg"
+                          className="btn-link"
+                          style={{ display: 'inline', padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}
                         >
-                          💳 Оплатить банковской картой
+                          оплатить на странице банка
                         </button>
-                        <p className="payment-hint">
-                          Перейти на защищённую страницу T-Bank для оплаты картой
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                      </p>
+                    </div>
+                  )}
+
+                  {widgetOk === false && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handlePayment}
+                        disabled={loading}
+                        className="btn-primary btn-lg"
+                        style={{ width: '100%', marginTop: '12px' }}
+                      >
+                        {loading ? 'Переход к оплате…' : 'Оплатить'}
+                      </button>
+                      <p className="payment-hint">
+                        СБП, T-Pay и карта — на защищённой странице T-Bank
+                      </p>
+                    </>
+                  )}
 
                   <button
                     type="button"
                     onClick={() => {
                       setShowPaymentButtons(false)
                       setOrderData(null)
-                      setShowOtherMethods(false)
+                      setWidgetOk(null)
                       integrationLoadedRef.current = false
                     }}
                     className="btn-link"

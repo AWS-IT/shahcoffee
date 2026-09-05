@@ -405,11 +405,13 @@ app.post('/api/tbank/initiate', async (req, res) => {
   // NotificationURL — куда T-Bank будет слать уведомления о статусе платежа
   params.NotificationURL = 'https://shahshop.ru/api/tbank/notification';
 
-  // DATA для виджета — connection_type обязателен для работы СБП/T-Pay кнопок
-  params.DATA = {
-    ...(data || {}),
-    connection_type: 'Widget'
-  };
+  // DATA для Init (connection_type: Widget только если фронт явно просит виджет)
+  if (data && typeof data === 'object') {
+    params.DATA = { ...data };
+  }
+  if (req.body?.widget === true) {
+    params.DATA = { ...(params.DATA || {}), connection_type: 'Widget' };
+  }
 
   const token = buildTbankToken(params, TBANK_PASSWORD);
   params.Token = token;
