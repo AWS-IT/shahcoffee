@@ -398,9 +398,9 @@ app.post('/api/tbank/initiate', async (req, res) => {
     Description: description || 'Оплата заказа',
   };
 
-  // Добавляем URLs для success/fail если они настроены, с orderId
-  if (TBANK_SUCCESS_URL) params.SuccessURL = appendOrderIdToUrl(TBANK_SUCCESS_URL, orderId);
-  if (TBANK_FAIL_URL) params.FailURL = appendOrderIdToUrl(TBANK_FAIL_URL, orderId);
+  // Success/Fail URL всегда с orderId — иначе /payment-result не сможет подтвердить оплату
+  params.SuccessURL = appendOrderIdToUrl(TBANK_SUCCESS_URL || 'https://shahshop.ru/payment-result', orderId);
+  params.FailURL = appendOrderIdToUrl(TBANK_FAIL_URL || 'https://shahshop.ru/payment/fail', orderId);
   
   // NotificationURL — куда T-Bank будет слать уведомления о статусе платежа
   params.NotificationURL = 'https://shahshop.ru/api/tbank/notification';
@@ -453,6 +453,13 @@ app.post('/api/tbank/initiate', async (req, res) => {
       const paymentUrl = json.PaymentURL || json.paymentUrl || json.paymentURL || json.PaymentUrl;
       if (!paymentUrl) {
         return res.status(502).json({ error: 'Invalid response from TBANK_INIT_URL', body: json });
+      }
+      if (json.PaymentId) {
+        try {
+          await updateOrderStatus(orderId, 'pending', String(json.PaymentId));
+        } catch (e) {
+          console.warn('Failed to save PaymentId:', e.message);
+        }
       }
       return res.json({ PaymentURL: paymentUrl, Success: json.Success, PaymentId: json.PaymentId });
     } catch (err) {
@@ -586,7 +593,41 @@ app.post('/api/tbank/check-status', async (req, res) => {
   }
 });
 
-// Endpoint: Получить статус заказа по orderId (проверяет в БД)
+// Спросить T-Bank CheckOrder и синхронизировать статус в БД (fallback если webhook задержался)
+async function syncOrderStatusFromTbank(orderId) {
+  if (!TBANK_TERMINAL || !TBANK_PASSWORD) return null;
+
+  const params = {
+    TerminalKey: TBANK_TERMINAL,
+    OrderId: orderId,
+  };
+  params.Token = buildTbankToken(params, TBANK_PASSWORD);
+
+  const response = await fetch('https://securepay.tinkoff.ru/v2/CheckOrder', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  const data = await response.json();
+  console.log('T-Bank CheckOrder:', data);
+
+  if (!data.Success || !Array.isArray(data.Payments) || data.Payments.length === 0) {
+    return null;
+  }
+
+  // Берём платёж с самым «финальным» статусом
+  const rank = { CONFIRMED: 5, AUTHORIZED: 4, REJECTED: 3, CANCELED: 3, DEADLINE_EXPIRED: 3, REFUNDED: 3, FORM_SHOWED: 1, NEW: 0 };
+  const best = data.Payments.reduce((a, b) =>
+    (rank[String(b.Status).toUpperCase()] || 0) >= (rank[String(a.Status).toUpperCase()] || 0) ? b : a
+  );
+
+  const status = String(best.Status).toLowerCase();
+  const paymentId = best.PaymentId != null ? String(best.PaymentId) : null;
+  await updateOrderStatus(orderId, status, paymentId);
+  return { status, paymentId, source: 'tbank' };
+}
+
+// Endpoint: Получить статус заказа (БД + CheckOrder если ещё не финальный)
 app.get('/api/order/:orderId/status', async (req, res) => {
   const { orderId } = req.params;
   
@@ -595,10 +636,49 @@ app.get('/api/order/:orderId/status', async (req, res) => {
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
     }
+
+    const finalStatuses = new Set(['confirmed', 'paid', 'authorized', 'rejected', 'canceled', 'cancelled', 'failed', 'refunded', 'deadline_expired']);
+    let status = order.status;
+    let paymentId = order.paymentId;
+    const wasPending = String(status || '').toLowerCase() === 'pending';
+
+    if (!finalStatuses.has(String(status || '').toLowerCase())) {
+      try {
+        const synced = await syncOrderStatusFromTbank(orderId);
+        if (synced) {
+          status = synced.status;
+          paymentId = synced.paymentId || paymentId;
+          // Webhook мог не дойти — отгрузка/Telegram при подтверждении через CheckOrder
+          if (wasPending && String(status).toUpperCase() === 'CONFIRMED') {
+            try {
+              const paid = await getOrderById(orderId);
+              if (paid?.items?.length > 0) {
+                try {
+                  await createMoySkladShipment(orderId, paid);
+                  console.log(`📦 Отгрузка по заказу ${orderId} создана в МойСклад (CheckOrder)`);
+                } catch (shipErr) {
+                  console.error('❌ Ошибка создания отгрузки в МойСклад:', shipErr.message);
+                }
+                try {
+                  await sendTelegramNotification(formatOrderForTelegram(orderId, paid, paid.totalPrice));
+                } catch (tgErr) {
+                  console.warn('Telegram уведомление не отправлено:', tgErr.message);
+                }
+              }
+            } catch (e) {
+              console.error('❌ Ошибка при обработке оплаченного заказа:', e.message);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('CheckOrder fallback failed:', e.message);
+      }
+    }
+
     res.json({ 
       orderId: order.orderId,
-      status: order.status,
-      paymentId: order.paymentId
+      status,
+      paymentId
     });
   } catch (err) {
     console.error('Error getting order status:', err.message);
@@ -632,8 +712,9 @@ app.post(TBANK_NOTIFICATION_URL, async (req, res) => {
   
   if (orderId && status) {
     try {
-      await updateOrderStatus(orderId, String(status).toLowerCase());
-      console.log(`✅ Order ${orderId} status updated to ${status}`);
+      const paymentId = payload.PaymentId != null ? String(payload.PaymentId) : null;
+      await updateOrderStatus(orderId, String(status).toLowerCase(), paymentId);
+      console.log(`✅ Order ${orderId} status updated to ${status}`, paymentId ? `(PaymentId ${paymentId})` : '');
     } catch (e) {
       console.warn('Failed to update order status:', e.message);
     }

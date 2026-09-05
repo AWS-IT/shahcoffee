@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 
+const CONFIRMED = ['confirmed', 'paid', 'authorized'];
+const FAILED = ['rejected', 'canceled', 'cancelled', 'failed', 'refunded', 'deadline_expired'];
+
 export default function PaymentResultPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -11,9 +14,11 @@ export default function PaymentResultPage() {
   const [message, setMessage] = useState('Проверяем статус платежа...');
 
   useEffect(() => {
+    let cancelled = false;
+
     const checkPaymentStatus = async () => {
-      // T-Bank: orderId передаётся в SuccessURL как query-параметр
-      const orderId = searchParams.get('orderId');
+      // orderId из SuccessURL; T-Bank иногда шлёт OrderId
+      const orderId = searchParams.get('orderId') || searchParams.get('OrderId');
 
       console.log('Payment result params:', { orderId });
 
@@ -23,95 +28,62 @@ export default function PaymentResultPage() {
         return;
       }
 
-      // Загружаем данные заказа из БД
       try {
         const orderRes = await fetch(`/api/orders/${orderId}`);
         if (orderRes.ok) {
           const order = await orderRes.json();
-          setOrderData(order);
+          if (!cancelled) setOrderData(order);
         }
       } catch (e) {
         console.error('Error loading order details:', e);
       }
 
-      // ВАЖНО: Проверяем реальный статус платежа на бэкенде
       try {
         setMessage('Проверяем статус платежа...');
-        
-        // Сначала проверим статус заказа в нашей БД (обновляется через notification от T-Bank)
-        const orderStatusRes = await fetch(`/api/order/${orderId}/status`);
-        
-        if (orderStatusRes.ok) {
-          const orderStatus = await orderStatusRes.json();
-          console.log('Order status from DB:', orderStatus);
-          
-          // Проверяем статус - должен быть confirmed или paid
-          const confirmedStatuses = ['confirmed', 'paid', 'authorized'];
-          if (confirmedStatuses.includes(orderStatus.status?.toLowerCase())) {
-            // Платёж подтверждён
+
+        // /api/order/:id/status сам дергает T-Bank CheckOrder, если в БД ещё pending
+        for (let attempt = 0; attempt < 8; attempt++) {
+          if (cancelled) return;
+          if (attempt > 0) {
+            setMessage('Ожидаем подтверждение от банка...');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+
+          const res = await fetch(`/api/order/${encodeURIComponent(orderId)}/status`);
+          if (!res.ok) continue;
+
+          const orderStatus = await res.json();
+          console.log(`Attempt ${attempt + 1}:`, orderStatus);
+          const s = orderStatus.status?.toLowerCase();
+
+          if (CONFIRMED.includes(s)) {
             setStatus('success');
             setMessage('Платеж успешно обработан!');
             clearCart();
-
-            setTimeout(() => {
-              navigate(`/order?id=${orderId}`);
-            }, 2000);
+            setTimeout(() => navigate(`/order?id=${orderId}`), 2000);
             return;
           }
-          
-          // Если статус rejected/canceled/failed
-          const failedStatuses = ['rejected', 'canceled', 'failed', 'refunded'];
-          if (failedStatuses.includes(orderStatus.status?.toLowerCase())) {
+
+          if (FAILED.includes(s)) {
             setStatus('error');
             setMessage('Платёж не прошёл. Пожалуйста, попробуйте снова.');
             return;
           }
         }
-        
-        // Если статус в БД не подтверждён, ждём немного и проверяем снова
-        // (notification от T-Bank может прийти с задержкой)
-        setMessage('Ожидаем подтверждение от банка...');
-        
-        // Делаем несколько попыток с интервалом
-        for (let attempt = 0; attempt < 5; attempt++) {
-          await new Promise(resolve => setTimeout(resolve, 2000)); // Ждём 2 сек
-          
-          const retryRes = await fetch(`/api/order/${orderId}/status`);
-          if (retryRes.ok) {
-            const retryStatus = await retryRes.json();
-            console.log(`Attempt ${attempt + 1}: Order status:`, retryStatus);
-            
-            if (['confirmed', 'paid', 'authorized'].includes(retryStatus.status?.toLowerCase())) {
-              setStatus('success');
-              setMessage('Платеж успешно обработан!');
-              clearCart();
 
-              setTimeout(() => {
-                navigate(`/order?id=${orderId}`);
-              }, 2000);
-              return;
-            }
-            
-            if (['rejected', 'canceled', 'failed'].includes(retryStatus.status?.toLowerCase())) {
-              setStatus('error');
-              setMessage('Платёж не прошёл. Пожалуйста, попробуйте снова.');
-              return;
-            }
-          }
-        }
-        
-        // Если после 5 попыток статус не определён — показываем предупреждение
         setStatus('error');
         setMessage('Не удалось подтвердить платёж. Если деньги списаны — свяжитесь с поддержкой.');
-        
       } catch (err) {
         console.error('Error checking payment status:', err);
-        setStatus('error');
-        setMessage('Ошибка проверки статуса платежа. Свяжитесь с поддержкой.');
+        if (!cancelled) {
+          setStatus('error');
+          setMessage('Ошибка проверки статуса платежа. Свяжитесь с поддержкой.');
+        }
       }
     };
 
     checkPaymentStatus();
+    return () => { cancelled = true; };
   }, [searchParams, clearCart, navigate]);
 
   return (
@@ -289,4 +261,3 @@ export default function PaymentResultPage() {
     </section>
   );
 }
-
