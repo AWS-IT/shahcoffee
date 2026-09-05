@@ -611,7 +611,7 @@ app.post(TBANK_NOTIFICATION_URL, async (req, res) => {
   if (orderId && status) {
     try {
       await updateOrderStatus(orderId, String(status).toLowerCase());
-      console.log(`✅ Order ${orderId} status updated to ${status}`);
+      console.log(`Order ${orderId} status updated to ${status}`); //так писать плохо на самом деле, все логи улетают в консоль браузера это не дает метрик и открывает инфу
     } catch (e) {
       console.warn('Failed to update order status:', e.message);
     }
